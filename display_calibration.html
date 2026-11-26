@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<!--
+  VEPeagle — Display Calibration  v1.2.0
+  =========================================
+  Author : Jan Kremlacek  |  License: MIT  |  2026
+
+  Stores calibration in localStorage under key 'vep_gamma_calibration' so that
+  the four VEP stimulus pages can read it and gamma-linearise their LUTs.
+
+  Three models:
+    - sRGB     IEC 61966-2-1 standard, no measurement required
+    - Power    Single γ value
+    - Measured Photometer data interpolated by Fritsch-Carlson monotone spline
+
+  Patch sequence:  V = [0, 16, 32, 64, 96, 128, 160, 192, 224, 255]  (10 steps)
+  In RGB mode each step is repeated for grey, R, G, and B → 40 measurements.
+
+  A 30-day age warning is shown on this page and on every stimulus page.
+-->
+<html lang="en" class="page-calibration">
+<head>
+<meta charset="UTF-8">
+  <script>(function(){
+    /* Theme, in order of precedence: the ?theme= parameter another page of the
+       suite passed on, the choice stored here, the system preference. Over
+       file:// the store is per-page, so the parameter is the only way across. */
+    var q = new URLSearchParams(location.search).get('theme');
+    var t = (q === 'light' || q === 'dark') ? q : null;
+    try { t = t || localStorage.getItem('vep_theme'); } catch (e) {}
+    if (!t && window.matchMedia)
+      t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', t || 'dark');
+    if (q === 'light' || q === 'dark') { try { localStorage.setItem('vep_theme', q); } catch (e) {} }
+  })()</script>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNCIgZmlsbD0iIzBkMGQwZCIvPgogIDxyZWN0IHg9IjMiIHk9IjUiICAgIHdpZHRoPSIyNiIgaGVpZ2h0PSI0LjUiIHJ4PSIxIiBmaWxsPSIjMDAwIi8+CiAgPHJlY3QgeD0iMyIgeT0iOS41IiAgd2lkdGg9IjI2IiBoZWlnaHQ9IjQuNSIgcng9IjEiIGZpbGw9IiMzYzNjM2MiLz4KICA8cmVjdCB4PSIzIiB5PSIxNCIgICB3aWR0aD0iMjYiIGhlaWdodD0iNC41IiByeD0iMSIgZmlsbD0iIzc4Nzg3OCIvPgogIDxyZWN0IHg9IjMiIHk9IjE4LjUiIHdpZHRoPSIyNiIgaGVpZ2h0PSI0LjUiIHJ4PSIxIiBmaWxsPSIjYjJiMmIyIi8+CiAgPHJlY3QgeD0iMyIgeT0iMjMiICAgd2lkdGg9IjI2IiBoZWlnaHQ9IjQuNSIgcng9IjEiIGZpbGw9IiNmZmYiLz4KPC9zdmc+">
+<title>VEPeagle — Display Calibration</title>
+<link rel="stylesheet" href="vep.css">
+</head>
+<body>
+
+<div id="overlay"><div id="overlayInner">
+<button id="themeToggleBtn" class="theme-toggle-btn" title="Switch light/dark theme" aria-label="Toggle light/dark theme">&#9728;</button>
+
+
+<h2>Display Calibration</h2>
+<p class="page-subtitle">Characterize monitor gamma for accurate VEP luminance control</p>
+
+<div id="statusBar" class="status-bar none">
+  No calibration saved — stimuli will assume sRGB and work in relative units, so no luminance can be reported.
+</div>
+
+<!-- MODEL -->
+<div class="section">
+  <div class="section-head"><div class="section-title">Model</div></div>
+  <div class="radio-row">
+    <label><input type="radio" name="model" value="srgb" checked> sRGB (IEC&nbsp;61966-2-1)</label>
+    <label><input type="radio" name="model" value="power"> Power law (γ)</label>
+    <label><input type="radio" name="model" value="measured"> Measured (photometer)</label>
+  </div>
+</div>
+
+<!-- LUMINANCE RANGE -->
+<div class="section">
+  <div class="section-head"><div class="section-title">Luminance range</div></div>
+  <div class="field-grid cols-3">
+    <div>
+      <label>L<sub>max</sub> (cd/m²)</label>
+      <input id="L_max" type="number" step="0.1" min="1" value="120">
+    </div>
+    <div>
+      <label>L<sub>min</sub> (cd/m²) — black level</label>
+      <input id="L_min" type="number" step="0.01" min="0" value="0.20">
+    </div>
+    <div>
+      <label>Monitor note</label>
+      <input id="monitorNote" type="text" placeholder="e.g. lab monitor, 80% brightness">
+    </div>
+  </div>
+</div>
+
+<!-- POWER-LAW -->
+<div class="section" id="powerSection">
+  <div class="section-head"><div class="section-title">Power-law gamma</div></div>
+  <div class="field-grid">
+    <div>
+      <label>γ (exponent)</label>
+      <input id="gammaVal" type="number" step="0.05" min="0.5" max="4" value="2.2">
+    </div>
+    <div class="t-mute" style="padding-top:.9em; font-size:.83em" >
+      L = (V/255)<sup>γ</sup> × (L<sub>max</sub> − L<sub>min</sub>) + L<sub>min</sub>
+    </div>
+  </div>
+</div>
+
+<!-- MEASURED -->
+<div class="section" id="measuredSection">
+  <div class="section-head"><div class="section-title">Photometer measurements</div></div>
+  <div class="tab-row">
+    <button class="tab-btn active" id="tabGrey" type="button">Grayscale</button>
+    <button class="tab-btn" id="tabRGB" type="button">R + G + B separately</button>
+  </div>
+  <div style="margin-bottom:.8em; display:flex; gap:.6em; align-items:center; flex-wrap:wrap">
+    <button class="primary" id="btnStartSeq" type="button">▶ Start guided measurement</button>
+    <span class="t-faint" style="font-size:.8em" >Full-screen patches advance step by step</span>
+  </div>
+  <div id="channelTables"></div>
+</div>
+
+<!-- GAMMA CURVE -->
+<div class="section">
+  <div class="section-head"><div class="section-title">Gamma curve</div></div>
+  <div class="plot-wrap">
+    <svg id="gammaPlot" width="380" height="230" viewBox="0 0 380 230"></svg>
+  </div>
+  <div class="t-faint" style="margin-top:.45em; font-size:.78em; text-align:center" >
+    <span class="t-grey" ><svg class="legend-key" width="26" height="10" viewBox="0 0 26 10" aria-hidden="true"><rect class="legend-bg" width="26" height="10" rx="2"/><line class="legend-srgb" x1="2" y1="5" x2="24" y2="5" stroke-width="1.5" stroke-dasharray="4 3"/></svg>sRGB reference</span> &nbsp;
+    <span class="legend-model-text"><svg class="legend-key" width="26" height="10" viewBox="0 0 26 10" aria-hidden="true"><rect class="legend-bg" width="26" height="10" rx="2"/><line class="legend-model" x1="2" y1="5" x2="24" y2="5" stroke-width="2"/></svg>fitted/model curve</span> &nbsp;
+    <span class="t-amber" ><svg class="legend-key" width="26" height="10" viewBox="0 0 26 10" aria-hidden="true"><rect class="legend-bg" width="26" height="10" rx="2"/><circle cx="13" cy="5" r="3" fill="#f4d35e" stroke="rgba(0,0,0,.5)" stroke-width="1"/></svg>measured points</span>
+  </div>
+</div>
+
+<!-- VERIFICATION -->
+<div class="section">
+  <div class="section-head"><div class="section-title">Verification target — V&nbsp;=&nbsp;128</div></div>
+  <div class="verif-grid">
+    <div class="verif-swatch-btn" id="verifShowBtn">
+      <span class="v-swatch" style="background:#808080"></span>
+      <span class="t-mute" style="font-size:.74em" >Click to show patch</span>
+    </div>
+    <div>
+      <div class="t-dim" style="font-size:.88em; margin-bottom:.45em" >
+        Expected from calibration: <strong id="verifExp" style="color:#7bc8e8">—</strong> cd/m²
+        &nbsp;<span class="t-faint" style="font-size:.88em" >(sRGB ref: <span id="verifSRGB">—</span>)</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:.6em">
+        <label style="font-size:.86em; margin:0; white-space:nowrap">Measured (cd/m²):</label>
+        <input id="verifMeas" type="number" step="0.01" placeholder="—" style="width:100px">
+        <span class="t-mute" style="font-size:.84em" id="verifDelta" ></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CONTRAST PREVIEW -->
+<div class="section">
+  <div class="section-head"><div class="section-title">Michelson contrast preview</div></div>
+  <div id="contrastPreview" style="font-size:.91em; color:#7bc8e8"></div>
+</div>
+
+<!-- ACTIONS -->
+<div class="section">
+  <div class="section-head"><div class="section-title">Save</div></div>
+  <div style="display:flex; gap:.7em; flex-wrap:wrap; align-items:center">
+    <button class="primary" id="btnSave" type="button">Save to browser storage</button>
+    <button class="primary" id="btnDownload" type="button" style="background:rgba(123,200,232,.18); color:#7bc8e8">↓ Download .json file</button>
+    <label class="link-btn" for="fileLoadInput" style="cursor:pointer">↑ Load .json file…</label>
+    <input id="fileLoadInput" type="file" accept=".json,application/json" style="display:none">
+    <button class="danger" id="btnClear" type="button">Clear</button>
+    <a class="link-btn" id="btnOpenGate" href="vep_gate.html" target="vep_gate">Open gate with this calibration →</a>
+  </div>
+  <div id="saveMsg" style="margin-top:.6em; font-size:.83em; color:#59c08b; display:none"></div>
+  <div class="t-faint" style="margin-top:.55em; font-size:.78em; line-height:1.5" >
+    <strong class="t-mute" >Note:</strong> Browser storage is not shared between
+    local files in most browsers, so saving here does not by itself reach the stimuli.
+    <em>Open gate with this calibration</em> carries it across in the link; download the
+    .json as well if you want a copy to archive with the recording or to load elsewhere.
+  </div>
+</div>
+
+<div class="doc-footer">
+  <span>Display Calibration — v1.2.0</span>
+  <a href="manual.html" target="vep_manual">Help &amp; documentation</a>
+  <span>© 2026 Jan Kremlacek — MIT License</span>
+</div>
+
+</div></div>
+
+<!-- PATCH OVERLAY -->
+<div id="patchOverlay">
+  <div id="patchBg"></div>
+  <div id="patchControls">
+    <span id="patchVLabel">V = 000</span>
+    <span id="patchStep">Step 1 / 10</span>
+    <label class="t-dim" style="font-size:.84em; margin:0; white-space:nowrap" >L (cd/m²):</label>
+    <input id="patchLInput" type="number" step="0.01" placeholder="e.g. 20.5">
+    <button class="pnav" id="btnPrev" type="button">← Prev</button>
+    <button class="pnav" id="btnRecord" type="button">Record &amp; Next →</button>
+    <button id="patchClose" type="button">Done</button>
+  </div>
+</div>
+
+<!-- VERIFICATION OVERLAY -->
+<div id="verifOvl">
+  <div id="verifBg"></div>
+  <div id="verifBar">
+    <span>Verification patch — V = 128 (mid-gray in digital space)</span>
+    <button class="pnav" id="btnVerifClose" type="button">Close</button>
+  </div>
+</div>
+
+<script src="vep_engine.js"></script>
+<script>
+'use strict';
+
+// ============================================================================
+// Constants & state
+// ============================================================================
+const GAMMA_KEY  = 'vep_gamma_calibration';
+const WARN_DAYS  = 30;
+const MEAS_VS    = [0, 16, 32, 64, 96, 128, 160, 192, 224, 255];
+const CH_LABEL   = { grey: 'Grey', R: 'Red', G: 'Green', B: 'Blue' };
+
+let model    = 'srgb';
+let chanMode = 'grey';
+
+// Measured luminance values: indexed by channel name
+const measL = {
+  grey: new Array(MEAS_VS.length).fill(''),
+  R:    new Array(MEAS_VS.length).fill(''),
+  G:    new Array(MEAS_VS.length).fill(''),
+  B:    new Array(MEAS_VS.length).fill(''),
+};
+
+// Sequential measurement state
+const seqOrder = [];
+let seqStep = 0;
+
+// ============================================================================
+// Math: sRGB & monotone cubic spline
+// ============================================================================
+function srgbToLinear(v8) {
+  const c = v8 / 255;
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+function srgbFwd(v8, Lmax, Lmin) {
+  return srgbToLinear(v8) * (Lmax - Lmin) + Lmin;
+}
+function buildMonoSpline(xs, ys) {
+  const n = xs.length;
+  if (n < 2) return function () { return ys[0] || 0; };
+  const h = [], s = [];
+  for (let i = 0; i < n - 1; i++) {
+    h[i] = xs[i + 1] - xs[i];
+    s[i] = (ys[i + 1] - ys[i]) / h[i];
+  }
+  const d = new Array(n);
+  d[0] = s[0];
+  d[n - 1] = s[n - 2];
+  for (let i = 1; i < n - 1; i++) {
+    if (s[i - 1] * s[i] <= 0) { d[i] = 0; continue; }
+    const w1 = 2 * h[i] + h[i - 1];
+    const w2 = h[i] + 2 * h[i - 1];
+    d[i] = (w1 + w2) / (w1 / s[i - 1] + w2 / s[i]);
+  }
+  for (let i = 0; i < n - 1; i++) {
+    if (Math.abs(s[i]) < 1e-10) { d[i] = d[i + 1] = 0; continue; }
+    const a = d[i] / s[i], b = d[i + 1] / s[i];
+    const r = Math.sqrt(a * a + b * b);
+    if (r > 3) { d[i] = 3 * s[i] * a / r; d[i + 1] = 3 * s[i] * b / r; }
+  }
+  return function (x) {
+    if (x <= xs[0]) return ys[0];
+    if (x >= xs[n - 1]) return ys[n - 1];
+    let i = 0;
+    while (i < n - 2 && xs[i + 1] < x) i++;
+    const t  = (x - xs[i]) / h[i];
+    const t2 = t * t, t3 = t2 * t;
+    return (2 * t3 - 3 * t2 + 1) * ys[i]
+         + (t3 - 2 * t2 + t) * h[i] * d[i]
+         + (-2 * t3 + 3 * t2) * ys[i + 1]
+         + (t3 - t2) * h[i] * d[i + 1];
+  };
+}
+
+function measuredPoints(chan) {
+  const out = [];
+  for (let i = 0; i < MEAS_VS.length; i++) {
+    const L = parseFloat(measL[chan][i]);
+    if (L > 0) out.push({ V: MEAS_VS[i], L: L });
+  }
+  return out;
+}
+
+// ============================================================================
+// Reading current model state from the DOM
+// ============================================================================
+function getModel() {
+  const r = document.querySelector('input[name=model]:checked');
+  return r ? r.value : 'srgb';
+}
+function getLmax() {
+  return Math.max(1, parseFloat(document.getElementById('L_max').value) || 120);
+}
+function getLmin() {
+  return parseFloat(document.getElementById('L_min').value) || 0;
+}
+function getGamma() {
+  return parseFloat(document.getElementById('gammaVal').value) || 2.2;
+}
+
+// Forward function: V (0-255) -> luminance (cd/m^2)
+function evalFwd(v, chan) {
+  const Lmax = getLmax(), Lmin = getLmin();
+  if (model === 'srgb') return srgbFwd(v, Lmax, Lmin);
+  if (model === 'power') {
+    return Math.pow(v / 255, getGamma()) * (Lmax - Lmin) + Lmin;
+  }
+  // measured
+  const c = (chanMode === 'rgb' && chan) ? chan : 'grey';
+  const pts = measuredPoints(c);
+  if (pts.length < 2) return srgbFwd(v, Lmax, Lmin);
+  return buildMonoSpline(pts.map(function (p) { return p.V; }),
+                         pts.map(function (p) { return p.L; }))(v);
+}
+
+// ============================================================================
+// Section visibility & channel mode
+// ============================================================================
+function onModelChange() {
+  model = getModel();
+  document.getElementById('powerSection').classList.toggle('hidden', model !== 'power');
+  document.getElementById('measuredSection').classList.toggle('hidden', model !== 'measured');
+  updateAll();
+}
+
+function setChannel(mode) {
+  chanMode = mode;
+  document.getElementById('tabGrey').classList.toggle('active', mode === 'grey');
+  document.getElementById('tabRGB').classList.toggle('active',  mode === 'rgb');
+  buildMeasurementTables();
+  updateAll();
+}
+
+// ============================================================================
+// Patch colour helper
+// ============================================================================
+function patchRGB(chan, v) {
+  if (chan === 'grey') return 'rgb(' + v + ',' + v + ',' + v + ')';
+  if (chan === 'R')    return 'rgb(' + v + ',0,0)';
+  if (chan === 'G')    return 'rgb(0,' + v + ',0)';
+  return 'rgb(0,0,' + v + ')';
+}
+
+// ============================================================================
+// Measurement tables (built dynamically)
+// ============================================================================
+function buildMeasurementTables() {
+  const wrap = document.getElementById('channelTables');
+  wrap.innerHTML = '';
+  const chans = chanMode === 'rgb' ? ['grey', 'R', 'G', 'B'] : ['grey'];
+
+  for (let ci = 0; ci < chans.length; ci++) {
+    const chan = chans[ci];
+
+    if (chanMode === 'rgb') {
+      const hdr = document.createElement('div');
+      hdr.style.cssText = 'font-size:.79em; color:rgba(123,200,232,.7); '
+        + 'letter-spacing:.1em; text-transform:uppercase; margin:.6em 0 .3em';
+      hdr.textContent = CH_LABEL[chan] + ' channel';
+      wrap.appendChild(hdr);
+    }
+
+    const tbl = document.createElement('table');
+    tbl.className = 'meas';
+
+    const thead = document.createElement('thead');
+    thead.innerHTML = '<tr><th>V</th><th>Patch</th><th>L (cd/m²)</th><th></th><th>✓</th></tr>';
+    tbl.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    for (let i = 0; i < MEAS_VS.length; i++) {
+      const v = MEAS_VS[i];
+      const tr = document.createElement('tr');
+
+      const tdV = document.createElement('td');
+      tdV.className = 'v-cell';
+      tdV.textContent = v;
+      tr.appendChild(tdV);
+
+      const tdSw = document.createElement('td');
+      tdSw.className = 'sw-cell';
+      const sw = document.createElement('span');
+      sw.className = 'meas-swatch';
+      sw.style.background = patchRGB(chan, v);
+      tdSw.appendChild(sw);
+      tr.appendChild(tdSw);
+
+      const tdInp = document.createElement('td');
+      const inp = document.createElement('input');
+      inp.className = 'L-input';
+      inp.type = 'number';
+      inp.step = '0.01';
+      inp.min  = '0';
+      inp.placeholder = '—';
+      inp.id = 'l_' + chan + '_' + i;
+      inp.value = measL[chan][i];
+      if (measL[chan][i]) inp.classList.add('filled');
+      (function (chCap, iCap, elCap) {
+        elCap.addEventListener('input', function () { onLInput(chCap, iCap, elCap); });
+      })(chan, i, inp);
+      tdInp.appendChild(inp);
+      tr.appendChild(tdInp);
+
+      const tdShow = document.createElement('td');
+      const showBtn = document.createElement('button');
+      showBtn.className = 'btn-show';
+      showBtn.type = 'button';
+      showBtn.textContent = 'Show';
+      (function (chCap, iCap) {
+        showBtn.addEventListener('click', function () { showSinglePatch(chCap, iCap); });
+      })(chan, i);
+      tdShow.appendChild(showBtn);
+      tr.appendChild(tdShow);
+
+      const tdDot = document.createElement('td');
+      const dot = document.createElement('span');
+      dot.className = 'dot';
+      dot.id = 'dot_' + chan + '_' + i;
+      if (measL[chan][i]) dot.classList.add('done');
+      tdDot.appendChild(dot);
+      tr.appendChild(tdDot);
+
+      tbody.appendChild(tr);
+    }
+    tbl.appendChild(tbody);
+    wrap.appendChild(tbl);
+  }
+}
+
+function onLInput(chan, i, el) {
+  measL[chan][i] = el.value;
+  el.classList.toggle('filled', el.value !== '');
+  const dot = document.getElementById('dot_' + chan + '_' + i);
+  if (dot) dot.classList.toggle('done', el.value !== '');
+
+  // Auto-fill L_max / L_min from greyscale endpoint measurements
+  if (chan === 'grey' && i === 0 && el.value)
+    document.getElementById('L_min').value = el.value;
+  if (chan === 'grey' && i === MEAS_VS.length - 1 && el.value)
+    document.getElementById('L_max').value = el.value;
+  updateAll();
+}
+
+// ============================================================================
+// Patch overlay
+// ============================================================================
+function showSinglePatch(chan, step) {
+  seqOrder.length = 0;
+  seqOrder.push({ chan: chan, step: step });
+  seqStep = 0;
+  openPatch();
+}
+
+function startSequence() {
+  seqOrder.length = 0;
+  const chans = chanMode === 'rgb' ? ['grey', 'R', 'G', 'B'] : ['grey'];
+  for (let ci = 0; ci < chans.length; ci++) {
+    for (let i = 0; i < MEAS_VS.length; i++) {
+      seqOrder.push({ chan: chans[ci], step: i });
+    }
+  }
+  seqStep = 0;
+  openPatch();
+}
+
+function openPatch() {
+  document.getElementById('patchLInput').value = '';
+  applyPatchDisplay();
+  document.getElementById('patchOverlay').classList.add('active');
+  setTimeout(function () { document.getElementById('patchLInput').focus(); }, 100);
+}
+
+function applyPatchDisplay() {
+  if (seqStep < 0 || seqStep >= seqOrder.length) return;
+  const item = seqOrder[seqStep];
+  const v    = MEAS_VS[item.step];
+
+  document.getElementById('patchBg').style.backgroundColor = patchRGB(item.chan, v);
+  document.getElementById('patchVLabel').textContent =
+    CH_LABEL[item.chan] + '  V = ' + v;
+  document.getElementById('patchStep').textContent =
+    'Step ' + (seqStep + 1) + ' / ' + seqOrder.length;
+
+  const existing = measL[item.chan][item.step];
+  document.getElementById('patchLInput').value = existing || '';
+  document.getElementById('btnRecord').textContent =
+    seqStep < seqOrder.length - 1 ? 'Record & Next →' : 'Record & Done ✓';
+}
+
+function recordAndAdvance() {
+  const val = document.getElementById('patchLInput').value.trim();
+  if (seqStep < seqOrder.length) {
+    const item = seqOrder[seqStep];
+    if (val) {
+      measL[item.chan][item.step] = val;
+      const el  = document.getElementById('l_' + item.chan + '_' + item.step);
+      const dot = document.getElementById('dot_' + item.chan + '_' + item.step);
+      if (el)  { el.value = val; el.classList.add('filled'); }
+      if (dot) dot.classList.add('done');
+      if (item.chan === 'grey' && item.step === 0)
+        document.getElementById('L_min').value = val;
+      if (item.chan === 'grey' && item.step === MEAS_VS.length - 1)
+        document.getElementById('L_max').value = val;
+    }
+  }
+  seqStep++;
+  if (seqStep >= seqOrder.length) {
+    closePatch();
+    updateAll();
+    return;
+  }
+  document.getElementById('patchLInput').value = '';
+  applyPatchDisplay();
+  document.getElementById('patchLInput').focus();
+}
+
+function patchNav(dir) {
+  seqStep = Math.max(0, Math.min(seqOrder.length - 1, seqStep + dir));
+  document.getElementById('patchLInput').value = '';
+  applyPatchDisplay();
+}
+
+function closePatch() {
+  document.getElementById('patchOverlay').classList.remove('active');
+  updateAll();
+}
+
+// ============================================================================
+// Verification overlay
+// ============================================================================
+function showVerifOvl() {
+  document.getElementById('verifOvl').classList.add('active');
+}
+function closeVerifOvl() {
+  document.getElementById('verifOvl').classList.remove('active');
+}
+
+// ============================================================================
+// Gamma plot (SVG, redrawn on every change)
+// ============================================================================
+function drawPlot() {
+  const svg = document.getElementById('gammaPlot');
+  if (!svg) return;
+  // The plot interior is dark in both themes; the reference needs a colour that
+  // reads on it from either page background.
+  const srgbCol = document.documentElement.getAttribute('data-theme') === 'light'
+    ? '#000' : 'rgba(150,150,150,.4)';
+  const W = 380, H = 230, ml = 46, mr = 10, mt = 12, mb = 32;
+  const pw = W - ml - mr, ph = H - mt - mb;
+  const Lmax = getLmax(), Lmin = getLmin();
+
+  function xp(v) { return ml + (v / 255) * pw; }
+  function yp(L) {
+    const Lc = Math.max(Lmin, Math.min(Lmax, L));
+    return mt + ph - ((Lc - Lmin) / (Lmax - Lmin)) * ph;
+  }
+
+  let h = '';
+  // Background
+  h += '<rect x="' + ml + '" y="' + mt + '" width="' + pw + '" height="' + ph
+    + '" fill="rgba(0,0,0,.35)" rx="3"/>';
+
+  // Vertical grid + V tick labels
+  [0, 64, 128, 192, 255].forEach(function (v) {
+    h += '<line x1="' + xp(v) + '" y1="' + mt + '" x2="' + xp(v) + '" y2="' + (mt + ph)
+      + '" stroke="rgba(255,255,255,.07)" stroke-width="1"/>';
+    h += '<text x="' + xp(v) + '" y="' + (mt + ph + 14)
+      + '" text-anchor="middle" fill="#5a7a8a" font-size="9">' + v + '</text>';
+  });
+  // Horizontal grid + L tick labels
+  [0, 0.25, 0.5, 0.75, 1].forEach(function (f) {
+    const L = Lmin + (Lmax - Lmin) * f;
+    const y = yp(L);
+    h += '<line x1="' + ml + '" y1="' + y + '" x2="' + (ml + pw) + '" y2="' + y
+      + '" stroke="rgba(255,255,255,.07)" stroke-width="1"/>';
+    h += '<text x="' + (ml - 4) + '" y="' + (y + 4)
+      + '" text-anchor="end" fill="#5a7a8a" font-size="9" font-family="monospace">'
+      + L.toFixed(0) + '</text>';
+  });
+
+  // Axis labels
+  h += '<text x="' + (ml + pw / 2) + '" y="' + (H - 2)
+    + '" text-anchor="middle" fill="#5a7a8a" font-size="10">Digital value (V)</text>';
+  h += '<text x="9" y="' + (mt + ph / 2)
+    + '" text-anchor="middle" fill="#5a7a8a" font-size="10" '
+    + 'transform="rotate(-90,9,' + (mt + ph / 2) + ')">Luminance (cd/m²)</text>';
+
+  // sRGB reference (grey dashed)
+  let srgbPts = '';
+  for (let k = 0; k <= 25; k++) {
+    const v = k * 10.2;
+    srgbPts += xp(v) + ',' + yp(srgbFwd(v, Lmax, Lmin)) + ' ';
+  }
+  h += '<polyline points="' + srgbPts.trim()
+    + '" fill="none" stroke="' + srgbCol + '" stroke-width="1.5" stroke-dasharray="4 3"/>';
+
+  // Active model curve (teal)
+  if (model !== 'measured' || measuredPoints('grey').length >= 2) {
+    let mPts = '';
+    for (let k = 0; k <= 50; k++) {
+      const v = k * 5.1;
+      mPts += xp(v) + ',' + yp(evalFwd(v, 'grey')) + ' ';
+    }
+    h += '<polyline points="' + mPts.trim()
+      + '" fill="none" stroke="#7bc8e8" stroke-width="2"/>';
+  }
+
+  // RGB channel splines (measured + RGB mode only)
+  if (model === 'measured' && chanMode === 'rgb') {
+    const cc = { R: 'rgba(255,80,80,.7)', G: 'rgba(80,210,80,.7)', B: 'rgba(80,130,255,.7)' };
+    ['R', 'G', 'B'].forEach(function (ch) {
+      const pts = measuredPoints(ch);
+      if (pts.length < 2) return;
+      const spl = buildMonoSpline(
+        pts.map(function (p) { return p.V; }),
+        pts.map(function (p) { return p.L; })
+      );
+      let mPts = '';
+      for (let k = 0; k <= 50; k++) {
+        const v = k * 5.1;
+        mPts += xp(v) + ',' + yp(spl(v)) + ' ';
+      }
+      h += '<polyline points="' + mPts.trim()
+        + '" fill="none" stroke="' + cc[ch] + '" stroke-width="1.5" stroke-dasharray="3 2"/>';
+    });
+  }
+
+  // Measured data points
+  const ptCol = { grey: '#f4d35e', R: '#ff6060', G: '#60e060', B: '#6090ff' };
+  const chans = chanMode === 'rgb' ? ['grey', 'R', 'G', 'B'] : ['grey'];
+  chans.forEach(function (ch) {
+    measuredPoints(ch).forEach(function (p) {
+      h += '<circle cx="' + xp(p.V) + '" cy="' + yp(p.L)
+        + '" r="4" fill="' + ptCol[ch] + '" stroke="rgba(0,0,0,.5)" stroke-width="1"/>';
+    });
+  });
+
+  // Frame
+  h += '<rect x="' + ml + '" y="' + mt + '" width="' + pw + '" height="' + ph
+    + '" fill="none" stroke="rgba(255,255,255,.12)" rx="3"/>';
+
+  svg.innerHTML = h;
+}
+
+// ============================================================================
+// Verification & contrast preview
+// ============================================================================
+function updateVerification() {
+  const Lmax = getLmax(), Lmin = getLmin();
+  const exp  = evalFwd(128, 'grey');
+  const sref = srgbFwd(128, Lmax, Lmin);
+  document.getElementById('verifExp').textContent  = exp.toFixed(2);
+  document.getElementById('verifSRGB').textContent = sref.toFixed(2) + ' cd/m²';
+  onVerifInput();
+}
+
+function onVerifInput() {
+  const meas = parseFloat(document.getElementById('verifMeas').value);
+  const exp  = parseFloat(document.getElementById('verifExp').textContent);
+  const el = document.getElementById('verifDelta');
+  if (!meas || isNaN(exp)) { el.textContent = ''; return; }
+  const d   = meas - exp;
+  const pct = (d / exp * 100).toFixed(1);
+  el.textContent = 'Δ = ' + (d > 0 ? '+' : '') + d.toFixed(2) + ' cd/m² (' + pct + '%)';
+  el.style.color = Math.abs(d / exp) < 0.05 ? '#59c08b' : '#e8a55a';
+}
+
+function updateContrastPreview() {
+  const Lw = evalFwd(255, 'grey');
+  const Lb = evalFwd(0, 'grey');
+  const mc = (Lw - Lb) / (Lw + Lb);
+  let html = 'L(255) = <strong>' + Lw.toFixed(2) + '</strong> cd/m²'
+    + ' &nbsp;·&nbsp; L(0) = <strong>' + Lb.toFixed(2) + '</strong> cd/m²'
+    + ' &nbsp;·&nbsp; Michelson contrast = <strong>' + mc.toFixed(4) + '</strong>';
+  if (Lb > 0.01) {
+    html += '<br><span style="font-size:.82em" class="t-dim-2">Black level '
+         + Lb.toFixed(2) + ' cd/m² limits achievable contrast below 1.0</span>';
+  }
+  document.getElementById('contrastPreview').innerHTML = html;
+}
+
+// ============================================================================
+// Save / load / clear
+// ============================================================================
+function buildCalibrationObj() {
+  const Lmax = getLmax(), Lmin = getLmin();
+  const note = document.getElementById('monitorNote').value.trim();
+  const obj = {
+    model:           model,
+    L_max_cdm2:      Lmax,
+    L_min_cdm2:      Lmin,
+    monitor_note:    note,
+    calibration_date: new Date().toISOString(),
+    software_version: '1.2.0',
+  };
+  if (model === 'power') obj.gamma = getGamma();
+  if (model === 'measured') {
+    function pts(chan) {
+      const out = [];
+      for (let i = 0; i < MEAS_VS.length; i++) {
+        const L = parseFloat(measL[chan][i]);
+        if (L > 0) out.push({ V: MEAS_VS[i], L: L });
+      }
+      return out;
+    }
+    obj.measured_grey = pts('grey');
+    if (chanMode === 'rgb') {
+      obj.measured_R = pts('R');
+      obj.measured_G = pts('G');
+      obj.measured_B = pts('B');
+    }
+  }
+  return obj;
+}
+
+/* ── Passing the calibration on ──────────────────────────────────────────────
+   The gate link carries the calibration in its URL, which is the only route
+   that works under file://. The file name travels with it when one is known,
+   so a log written later can name the source rather than just recording that
+   something arrived in a link. */
+const gEncodeCalForURL = (typeof VEP !== 'undefined' && VEP.encodeCalForURL)
+                       ? VEP.encodeCalForURL : null;
+let calFileName = '';        // .json this calibration is known to correspond to
+let calFileFingerprint = ''; // what it looked like then, so edits invalidate it
+
+/** Identity of a calibration ignoring the timestamp, which is regenerated on
+    every build and would otherwise make every comparison fail. */
+function calFingerprint(obj) {
+  if (!obj) return '';
+  const c = Object.assign({}, obj);
+  delete c.calibration_date;
+  return JSON.stringify(c);
+}
+
+function noteCalFile(name) {
+  calFileName = name || '';
+  calFileFingerprint = calFingerprint(buildCalibrationObj());
+}
+
+/** The file name, but only while it still describes what is in the form. */
+function currentCalFileName() {
+  if (!calFileName) return '';
+  return calFingerprint(buildCalibrationObj()) === calFileFingerprint ? calFileName : '';
+}
+
+/** Gate URL carrying the calibration currently in the form. */
+function buildGateURL() {
+  if (!gEncodeCalForURL) return 'vep_gate.html';
+  const obj = buildCalibrationObj();
+  if (!obj || !obj.model || !(obj.L_max_cdm2 > 0)) return 'vep_gate.html';
+  const enc = gEncodeCalForURL(obj);
+  if (!enc) return 'vep_gate.html';
+  const p = new URLSearchParams();
+  p.set('cal', enc);
+  const name = currentCalFileName();
+  if (name) p.set('cal_name', name);
+  return 'vep_gate.html?' + p.toString();
+}
+
+function saveCalibration() {
+  try {
+    localStorage.setItem(GAMMA_KEY, JSON.stringify(buildCalibrationObj()));
+    const m = document.getElementById('saveMsg');
+    m.textContent = 'Saved ' + new Date().toLocaleString();
+    m.style.display = 'block';
+    setTimeout(function () { m.style.display = 'none'; }, 3000);
+    updateStatusBar();
+  } catch (e) {
+    alert('Could not save: ' + e.message);
+  }
+}
+
+/**
+ * Clear both halves of what "the calibration" means here: the copy in browser
+ * storage and the values on screen. Clearing only the stored copy left the form
+ * still full, so the page looked calibrated while the stimuli had nothing —
+ * and the next Save would silently put the same numbers straight back.
+ * The defaults below mirror the values written in the markup.
+ */
+function clearCalibration() {
+  if (!confirm('Clear the saved calibration and reset this form? '
+             + 'Stimuli will revert to assuming sRGB in relative units.')) return;
+  localStorage.removeItem(GAMMA_KEY);
+
+  model    = 'srgb';
+  chanMode = 'grey';
+  const r = document.querySelector('input[name=model][value="srgb"]');
+  if (r) r.checked = true;
+  document.getElementById('L_max').value       = '120';
+  document.getElementById('L_min').value       = '0.20';
+  document.getElementById('gammaVal').value    = '2.2';
+  document.getElementById('monitorNote').value = '';
+  ['grey','R','G','B'].forEach(function (c) {
+    for (let i = 0; i < MEAS_VS.length; i++) measL[c][i] = '';
+  });
+  calFileName = '';           // nothing on screen corresponds to a file any more
+  calFileFingerprint = '';
+
+  onModelChange();
+  setChannel(chanMode);
+  buildMeasurementTables();
+  updateAll();
+  updateStatusBar();
+
+  const m = document.getElementById('saveMsg');
+  if (m) {
+    m.textContent = 'Calibration cleared.';
+    m.style.color = '#59c08b';
+    m.style.display = 'block';
+    setTimeout(function () { m.style.display = 'none'; }, 3000);
+  }
+}
+
+function downloadCalibration() {
+  const obj  = buildCalibrationObj();
+  const json = JSON.stringify(obj, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  const dateStr = new Date().toISOString().slice(0, 10);
+  a.download = 'vep_calibration_' + dateStr + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  noteCalFile(a.download);   // this calibration now corresponds to a real file
+  const m = document.getElementById('saveMsg');
+  m.textContent = 'Downloaded ' + a.download;
+  m.style.display = 'block';
+  setTimeout(function () { m.style.display = 'none'; }, 4000);
+}
+
+function loadCalibrationFromFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function (ev) {
+    let cal;
+    try {
+      cal = JSON.parse(ev.target.result);
+      if (!cal || typeof cal !== 'object' || !cal.model) {
+        throw new Error('not a calibration file');
+      }
+    } catch (e) {
+      alert('Could not load: ' + e.message);
+      return;
+    }
+    // Apply to form
+    model = cal.model || 'srgb';
+    const r = document.querySelector('input[name=model][value="' + model + '"]');
+    if (r) r.checked = true;
+    if (cal.L_max_cdm2 != null) document.getElementById('L_max').value = cal.L_max_cdm2;
+    if (cal.L_min_cdm2 != null) document.getElementById('L_min').value = cal.L_min_cdm2;
+    if (cal.monitor_note)       document.getElementById('monitorNote').value = cal.monitor_note;
+    if (cal.gamma != null)      document.getElementById('gammaVal').value = cal.gamma;
+
+    // Reset measurement arrays
+    ['grey','R','G','B'].forEach(function (c) {
+      for (let i = 0; i < MEAS_VS.length; i++) measL[c][i] = '';
+    });
+    if (model === 'measured') {
+      if (cal.measured_R || cal.measured_G || cal.measured_B) chanMode = 'rgb';
+      else chanMode = 'grey';
+      function restore(arr, chan) {
+        if (!arr) return;
+        arr.forEach(function (p) {
+          const i = MEAS_VS.indexOf(p.V);
+          if (i >= 0) measL[chan][i] = String(p.L);
+        });
+      }
+      restore(cal.measured_grey, 'grey');
+      restore(cal.measured_R, 'R');
+      restore(cal.measured_G, 'G');
+      restore(cal.measured_B, 'B');
+    }
+
+    onModelChange();
+    setChannel(chanMode);
+    buildMeasurementTables();
+    updateAll();
+    noteCalFile(file.name);
+    const m = document.getElementById('saveMsg');
+    m.textContent = 'Loaded ' + file.name + ' — review then click Save to store in browser';
+    m.style.color = '#59c08b';
+    m.style.display = 'block';
+    setTimeout(function () { m.style.display = 'none'; }, 5000);
+  };
+  reader.readAsText(file);
+}
+
+function loadFromStorage() {
+  let cal = null;
+  try { cal = JSON.parse(localStorage.getItem(GAMMA_KEY) || 'null'); } catch (e) { return; }
+  if (!cal) return;
+
+  model = cal.model || 'srgb';
+  const r = document.querySelector('input[name=model][value="' + model + '"]');
+  if (r) r.checked = true;
+
+  if (cal.L_max_cdm2 != null) document.getElementById('L_max').value = cal.L_max_cdm2;
+  if (cal.L_min_cdm2 != null) document.getElementById('L_min').value = cal.L_min_cdm2;
+  if (cal.monitor_note)       document.getElementById('monitorNote').value = cal.monitor_note;
+  if (cal.gamma != null)      document.getElementById('gammaVal').value = cal.gamma;
+
+  if (model === 'measured') {
+    if (cal.measured_R || cal.measured_G || cal.measured_B) chanMode = 'rgb';
+    function restore(arr, chan) {
+      if (!arr) return;
+      arr.forEach(function (p) {
+        const i = MEAS_VS.indexOf(p.V);
+        if (i >= 0) measL[chan][i] = String(p.L);
+      });
+    }
+    restore(cal.measured_grey, 'grey');
+    restore(cal.measured_R, 'R');
+    restore(cal.measured_G, 'G');
+    restore(cal.measured_B, 'B');
+  }
+}
+
+function updateStatusBar() {
+  let cal = null;
+  try { cal = JSON.parse(localStorage.getItem(GAMMA_KEY) || 'null'); } catch (e) {}
+  const bar = document.getElementById('statusBar');
+  if (!cal) {
+    bar.className = 'status-bar none';
+    bar.innerHTML = 'No calibration saved — stimuli will assume sRGB and work in relative units, so no luminance can be reported.';
+    return;
+  }
+  const d    = new Date(cal.calibration_date);
+  const days = Math.floor((Date.now() - d) / 86400000);
+  const modelStr = ({
+    srgb:     'sRGB',
+    power:    'Power-law (γ=' + cal.gamma + ')',
+    measured: 'Measured (photometer)',
+  })[cal.model] || cal.model;
+  const Ls = cal.L_max_cdm2 ? ' · L_max = ' + cal.L_max_cdm2 + ' cd/m²' : '';
+  const ns = cal.monitor_note ? ' · ' + cal.monitor_note : '';
+  /* One fixed date form across the suite, independent of the machine's locale. */
+  let dStr;
+  try { dStr = d.toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }); }
+  catch (e) { dStr = d.toDateString(); }
+
+  if (days >= WARN_DAYS) {
+    bar.className = 'status-bar warn';
+    bar.innerHTML = '⚠ Calibration is <strong>' + days + ' days old</strong>'
+      + ' — consider recalibrating. ' + modelStr + Ls + ns
+      + ' (saved ' + dStr + ')';
+  } else {
+    bar.className = 'status-bar ok';
+    bar.innerHTML = '✓ Calibration saved — ' + modelStr + Ls + ns
+      + ' · ' + dStr + ' · ' + days + ' day' + (days === 1 ? '' : 's') + ' ago';
+  }
+}
+
+// ============================================================================
+// Master update + event wiring + init
+// ============================================================================
+function updateAll() {
+  drawPlot();
+  updateVerification();
+  updateContrastPreview();
+}
+
+function wireEvents() {
+  // Model radios
+  const radios = document.querySelectorAll('input[name=model]');
+  for (let i = 0; i < radios.length; i++) {
+    radios[i].addEventListener('change', onModelChange);
+  }
+
+  // Number / text inputs that affect the plot
+  ['L_max', 'L_min', 'gammaVal'].forEach(function (id) {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', updateAll);
+  });
+
+  // Verification measured input
+  document.getElementById('verifMeas').addEventListener('input', onVerifInput);
+
+  // Tab buttons
+  document.getElementById('tabGrey').addEventListener('click', function () { setChannel('grey'); });
+  document.getElementById('tabRGB').addEventListener('click',  function () { setChannel('rgb');  });
+
+  // Guided sequence button
+  document.getElementById('btnStartSeq').addEventListener('click', startSequence);
+
+  // Patch overlay buttons
+  document.getElementById('btnPrev').addEventListener('click',   function () { patchNav(-1); });
+  document.getElementById('btnRecord').addEventListener('click', recordAndAdvance);
+  document.getElementById('patchClose').addEventListener('click', closePatch);
+  document.getElementById('patchLInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') recordAndAdvance();
+  });
+
+  // Verification overlay
+  document.getElementById('verifShowBtn').addEventListener('click', showVerifOvl);
+  document.getElementById('btnVerifClose').addEventListener('click', closeVerifOvl);
+
+  // Save / clear / download / load file
+  document.getElementById('btnSave').addEventListener('click', saveCalibration);
+  document.getElementById('btnClear').addEventListener('click', clearCalibration);
+  document.getElementById('btnDownload').addEventListener('click', downloadCalibration);
+  document.getElementById('fileLoadInput').addEventListener('change', function (ev) {
+    if (ev.target.files && ev.target.files[0]) loadCalibrationFromFile(ev.target.files[0]);
+    ev.target.value = '';   // allow re-loading the same file
+  });
+  /* Build the URL at the moment of the click, so it always reflects the form as
+     it stands rather than whatever it held when the page was drawn. */
+  const gateLink = document.getElementById('btnOpenGate');
+  if (gateLink) {
+    gateLink.addEventListener('click', function () { this.href = buildGateURL(); });
+  }
+}
+
+window.addEventListener('DOMContentLoaded', function () {
+  loadFromStorage();
+  wireEvents();
+  onModelChange();        // sets section visibility
+  buildMeasurementTables();
+  updateStatusBar();
+  updateAll();
+});
+
+/* ── Light / dark theme toggle ── */
+(function () {
+  var KEY  = 'vep_theme';
+  var SUN  = '\u2600';  // ☀  shown in dark mode (click to go light)
+  var MOON = '\u25D7';  // ◗  shown in light mode (click to go dark)
+
+  function applyTheme(t) {
+    document.documentElement.setAttribute('data-theme', t || 'dark');
+    var btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.textContent = (t === 'light') ? MOON : SUN;
+    // The gamma plot picks its reference colour from the theme.
+    if (typeof drawPlot === 'function') drawPlot();
+  }
+
+  /* The bootstrap in <head> has already resolved the theme; follow it rather
+     than reading the store again, which would undo a theme passed in the URL. */
+  applyTheme(document.documentElement.getAttribute('data-theme') || 'dark');
+
+  document.addEventListener('DOMContentLoaded', function () {
+    applyTheme(document.documentElement.getAttribute('data-theme') || 'dark');
+    var btn = document.getElementById('themeToggleBtn');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+        try { localStorage.setItem(KEY, next); } catch (e) {}
+        applyTheme(next);
+      });
+    }
+
+    /* Hand the theme to the next page of the suite. The href is rewritten on
+       the way out, so links the page rebuilds at runtime are covered too. */
+    document.addEventListener('click', function (e) {
+      var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+      if (!a) return;
+      var href = a.getAttribute('href') || '';
+      if (!href || href.charAt(0) === '#') return;
+      var u;
+      try { u = new URL(a.href, location.href); } catch (err) { return; }
+      if (u.protocol !== location.protocol || !/\.html$/i.test(u.pathname)) return;
+      u.searchParams.set('theme', document.documentElement.getAttribute('data-theme') || 'dark');
+      a.href = u.toString();
+    }, true);
+  });
+})();
+
+</script>
+
+</body>
+</html>

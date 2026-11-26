@@ -1,0 +1,38 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: VEPeagle
+abstract: >-
+  A browser-based visual evoked potential stimulus suite. Flash, pattern
+  reversal, pattern onset, radial motion onset and oddball paradigms run from a
+  folder on disk with no installation, server or network connection. Stimulus
+  timing is verified by a photocell reading a synchronisation patch on the
+  display, the display is characterised photometrically from a measured
+  calibration file, and the WebGL2 and Canvas 2D render paths are compared
+  pixel by pixel before every session. Each condition is fully described by its
+  URL, and oddball sequences are reproducible from a seed.
+authors:
+  - family-names: Kremláček
+    given-names: Jan
+    orcid: "https://orcid.org/0000-0001-8641-4287"
+    affiliation: "Department of Medical Biophysics, Faculty of Medicine in Hradec Králové, Charles University"
+version: 1.2.0
+date-released: "2026-11-24"
+license: MIT
+repository-code: "https://github.com/Jan-Kremlacek/vepeagle"
+# TODO before release: add the Zenodo concept DOI once the first GitHub
+# release has been archived:
+#   doi: "10.5281/zenodo.XXXXXXX"
+keywords:
+  - visual evoked potentials
+  - VEP
+  - electrophysiology
+  - visual stimulation
+  - pattern reversal
+  - pattern onset
+  - motion onset
+  - oddball paradigm
+  - display calibration
+  - photodiode
+  - ISCEV
+  - reproducible research

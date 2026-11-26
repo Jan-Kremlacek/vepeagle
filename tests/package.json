@@ -1,0 +1,10 @@
+{
+  "name": "vep-suite-tests",
+  "private": true,
+  "description": "Development checks for the VEP stimulus suite (not shipped to users)",
+  "devDependencies": {
+    "eslint": "9.39.5",
+    "globals": "15.15.0",
+    "p5": "1.9.3"
+  }
+}

@@ -1,0 +1,3418 @@
+<!DOCTYPE html>
+<!--
+  Oddball VEP Stimulus
+  ====================
+  Author : Jan Kremlacek
+  Version: 1.2.0
+  License: MIT
+
+  Description
+  -----------
+  Oddball paradigm: a frequent standard and a rare deviant, optionally a third
+  stimulus, presented one at a time at the screen centre on a uniform
+  background. Each stimulus is a binary shape -- a built-in X, O or + drawn from
+  geometry, or an SVG file -- of a set height in degrees.
+
+  Sequence
+  --------
+  Exact counts per stimulus, the standards opening the sequence, a minimum
+  number of standards before every non-standard trial and an optional longest
+  run of standards. The order is drawn from a seed with a deterministic
+  generator; every order satisfying the constraints is equally likely. The seed
+  is written into the link and the log, so the order can be rebuilt.
+
+  Timing
+  ------
+  ON phase: onDuration ms (stimulus visible); OFF phase: offDuration ms plus an
+  optional 0..offJitter ms in whole frames, drawn from the same seed. A
+  background-only startDelay precedes the first trial and follows the last.
+
+  Sync dot
+  --------
+  Fires at stimulus onset (optionally offset) in the colour of the stimulus
+  shown (hexSync1..3), so the recording can tell the stimuli apart; black
+  between triggers.
+
+  GET parameters (all optional)
+  -----------------------------
+  shape1..3 (X | O | + | svg), svg1..3, svg1..3_name, hexStim1..3, useStim3,
+  count2, count3, hexBlank, shapeHeight, strokeWidth, targetContrast,
+  nCycles, firstStandards, minStandards, maxStandardRun, seed,
+  onDuration, offDuration, offJitter, startDelay,
+  screen_width_px, screen_width_cm, view_distance_cm, displayRefreshHz,
+  useFullscreen, dot_x, dot_y, dotSize, syncDotFrames, hexSync1..3,
+  syncOnOnset, syncOnOffset, showFixation, fixationRadius, fixationThickness,
+  hexFixation, enableLogging, note, cal, cal_name
+-->
+<html lang="en" class="page-oddball">
+<head>
+  <meta charset="UTF-8" />
+  <script>(function(){
+    /* Theme, in order of precedence: the ?theme= parameter another page of the
+       suite passed on, the choice stored here, the system preference. Over
+       file:// the store is per-page, so the parameter is the only way across. */
+    var q = new URLSearchParams(location.search).get('theme');
+    var t = (q === 'light' || q === 'dark') ? q : null;
+    try { t = t || localStorage.getItem('vep_theme'); } catch (e) {}
+    if (!t && window.matchMedia)
+      t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', t || 'dark');
+    if (q === 'light' || q === 'dark') { try { localStorage.setItem('vep_theme', q); } catch (e) {} }
+  })()</script>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiBmaWxsPSIjMWMxYzFjIi8+CiAgPGNpcmNsZSBjeD0iNSIgY3k9IjE2IiByPSIzIiBmaWxsPSIjZmZmIi8+CiAgPGNpcmNsZSBjeD0iMTMiIGN5PSIxNiIgcj0iMyIgZmlsbD0iI2ZmZiIvPgogIDxyZWN0IHg9IjE4IiB5PSIxMyIgd2lkdGg9IjYiIGhlaWdodD0iNiIgZmlsbD0iIzdiYzhlOCIvPgogIDxjaXJjbGUgY3g9IjI5IiBjeT0iMTYiIHI9IjMiIGZpbGw9IiNmZmYiLz4KPC9zdmc+Cg==">
+  <title>Oddball VEP Stimulus</title>
+  <!-- p5.js 1.9.3, LGPL-2.1, bundled so the suite runs without a network.
+       See THIRD_PARTY.md and p5.js-LICENSE.txt. -->
+  <script src="p5.min.js"></script>
+<script src="vep_engine.js"></script>
+<script src="vep_page.js"></script>
+<script>
+/* Without the engine a stimulus page cannot do anything: run control, the
+   window protocol, pattern rendering and the whole luminance model live there.
+   Failing on the first VEP.* reference would leave a page that looks like it is
+   loading and never says why, so say it plainly and stop. */
+if (typeof VEP === 'undefined' || !VEP.version) {
+  document.addEventListener('DOMContentLoaded', function () {
+    document.documentElement.classList.remove('vep-child');
+    document.body.innerHTML =
+      '<div style="position:fixed; inset:0; display:flex; flex-direction:column;'
+      + 'align-items:center; justify-content:center; gap:1rem; padding:2rem; text-align:center;'
+      + 'background:#0f141b; color:#e8a55a;'
+      + 'font:16px/1.6 system-ui,-apple-system,sans-serif;">'
+      + '<div style="font-size:1.3rem; font-weight:600;">&#9888; vep_engine.js could not be loaded</div>'
+      + '<div style="max-width:34rem; color:#e6ecf4;">This page needs <code>vep_engine.js</code> '
+      + 'in the same folder. Copy it there and reload \u2014 no stimulus can be presented '
+      + 'without it.</div></div>';
+  });
+  throw new Error('vep_engine.js not loaded');
+}
+</script>
+<script>
+/* p5.min.js and vep_page.js sit beside this page. If either did not load, the
+   page still renders and its settings still read correctly, but nothing can
+   run: an unguarded Start does nothing or hangs at 'Starting...' with an
+   uncaught ReferenceError, and explains nothing. Name the missing file and
+   withhold Start. This check is a listener of its own, registered here in
+   <head>, because the code that would otherwise report it lives in the very
+   files that may be missing, and a page that builds its run controls inside
+   p5's setup() never reaches _refreshRunControls() at all. */
+document.addEventListener('DOMContentLoaded', function () {
+  const missing = [];
+  if (typeof p5 === 'undefined') missing.push('p5.min.js');
+  if (typeof _refreshRunControls !== 'function') missing.push('vep_page.js');
+  if (!missing.length) return;
+  const msg = (missing.length === 1 ? missing[0] + ' did not load'
+                                    : missing.join(' and ') + ' did not load')
+    + ', so no stimulus can run. This page needs '
+    + (missing.length === 1 ? 'it' : 'them') + ' in the same folder; copy '
+    + (missing.length === 1 ? 'it' : 'them') + ' there and reload.';
+  const btn = document.getElementById('runStartBtn');
+  const st  = document.getElementById('runStatus');
+  if (btn) { btn.disabled = true; btn.title = msg; }
+  if (st) { st.textContent = msg; st.classList.add('warn'); }
+});
+</script>
+  <link rel="stylesheet" href="vep.css">
+  <script>
+    /* The presentation window is named per stimulus (vep_present_<stimulus>), so
+       recognise the family rather than one literal name — this runs before the
+       engine loads and cannot ask it. */
+    if (window.opener && /^vep_present_/.test(window.name))
+      document.documentElement.classList.add('vep-child');
+    /* Autostart presents in this very window, so the settings have to be out of
+       the way before anything is painted — the confirmation screen replaces
+       them. Kept here with the other early test so the two cannot drift apart. */
+    if (/[?&]autostart=(1|true|yes|on)(?:&|$)/i.test(window.location.search))
+      document.documentElement.classList.add('vep-child');
+  </script>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════
+     Setup overlay
+     ══════════════════════════════════════════════════════ -->
+<div id="overlay">
+<div id="overlayInner">
+<div id="bgWarn" style="display:none; margin:.5em 0 .9em; padding:.65em .95em; border-radius:.42em; border:1px solid rgba(232,165,90,.5); background:rgba(232,165,90,.1); color:#b06010; font-size:.9em; white-space:pre-line; line-height:1.5;"></div>
+<button id="themeToggleBtn" class="theme-toggle-btn" title="Switch light/dark theme" aria-label="Toggle light/dark theme">&#9728;</button>
+
+
+  <h2>Oddball VEP Stimulus</h2>
+  <div class="page-subtitle">Standard · deviant · optional third stimulus</div>
+
+  <!-- ══ RUN CONTROLS (Start / Pause / Stop + status) ══ -->
+  <div class="run-panel">
+    <div class="run-buttons">
+      <button id="runStartBtn" type="button">Start</button>
+      <button id="runPauseBtn" type="button" class="secondary" disabled>Pause</button>
+      <button id="runStopBtn"  type="button" class="secondary" disabled>Stop</button>
+      <span class="spacer"></span>
+      <label class="inline" style="font-size:.88em;"
+             title="Present fullscreen. The stimulus window has to enter fullscreen itself — click it or press F.">
+        <input id="useFullscreen" type="checkbox">
+        Fullscreen
+      </label>
+      <button id="openWindowBtn" type="button" class="secondary" title="Open stimulus in a separate window">↗ New window</button>
+      <button id="exitFsBtn" type="button" class="secondary" style="display:none;" onclick="document.exitFullscreen()">Exit fullscreen</button>
+    </div>
+    <div id="runStatus" class="run-status">Ready.</div>
+    <div class="log-row">
+      <label class="inline" style="font-size:.9em;">
+        <input id="enableLogging" type="checkbox">
+        Save log
+      </label>
+      <input id="noteField" type="text" placeholder="Session note (subject code / condition)…"
+             title="Saved into the log; only used when Save log is checked">
+    </div>
+  </div>
+
+  <form id="paramForm" onsubmit="return false;" autocomplete="off">
+
+    <!-- ══ SCREEN ══ -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">Screen</div>
+      </div>
+      <div id="screenScopeNote" style="
+        display:none; margin:0 0 .7em; padding:.45em .7em; font-size:.8em; line-height:1.5;
+        border-radius:.4em; border:1px solid rgba(232,165,90,.4);
+        background:rgba(232,165,90,.08); color:#e8a55a;
+      "></div>
+      <div id="refreshMismatchNote" style="
+        display:none; margin:0 0 .7em; padding:.45em .7em; font-size:.8em; line-height:1.5;
+        border-radius:.4em; border:1px solid rgba(232,165,90,.4);
+        background:rgba(232,165,90,.08); color:#e8a55a;
+      "></div>
+      <div class="field-grid cols-3">
+        <div>
+          <label>Width (px) <span style="opacity:.45; font-size:.88em;">auto</span></label>
+          <input id="screen_width_px" type="number" min="240" max="30000" step="1" required>
+        </div>
+        <div>
+          <label>Width (cm)</label>
+          <input min="0.1" max="500" id="screen_width_cm" type="number" step="any" value="53" required>
+        </div>
+        <div>
+          <label>View distance (cm)</label>
+          <input min="10" max="1000" id="view_distance_cm" type="number" step="any" value="57" required>
+        </div>
+        <div>
+          <label>Display refresh (Hz) <span style="opacity:.45; font-size:.88em;">optional</span></label>
+          <input id="displayRefreshHz" type="number" step="1" min="1" max="1000" placeholder="e.g. 60"
+                 title="What the operating system reports for the display the subject sees. No browser API exposes it, so it can only be entered by hand.">
+        </div>
+      </div>
+      <div style="margin-top:.7em">
+        <label>Gamma calibration</label>
+        <div id="calibrationStatus" style="
+          padding:.32em .55em; border-radius:.4em;
+          border:1px solid rgba(255,255,255,.1);
+          background:rgba(0,0,0,.25); font-size:.9em; line-height:1.55;
+        ">Loading&hellip;</div>
+        <div style="margin-top:.55em; display:flex; gap:.6em; align-items:center; flex-wrap:wrap;">
+          <label for="calLoadInput" style="
+            display:inline-block; padding:.32em .85em; font-size:.82em;
+            border-radius:1.2em; border:1px solid rgba(123,200,232,.3);
+            background:rgba(0,0,0,.3); color:#7bc8e8; cursor:pointer; margin:0;">
+            Load calibration .json file&hellip;
+          </label>
+          <input id="calLoadInput" type="file" accept=".json,application/json"
+            style="display:none">
+          <span class="t-faint" style="font-size:.78em" id="calFileMsg" ></span>
+        </div>
+      </div>
+      <div id="rendererNote" style="margin-top:.6em; font-size:.78em; color:var(--text-mute);">Renderer: detecting…</div>
+    </div>
+
+    <!-- ══ STIMULI ══ -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">Stimuli</div>
+        <div style="display:flex; gap:.7em; align-items:center;">
+          <div class="colour-pair" title="Background: fills the screen between stimuli and around them">
+            <span>Background</span>
+            <span class="swatch" id="swatchBlank" title="Background color" style="background:#808080;"></span>
+            <input class="hex-input" id="hexBlank" type="text" maxlength="7" value="#808080">
+          </div>
+        </div>
+      </div>
+
+      <div class="stim-grid">
+        <div class="stim-head">Stimulus</div>
+        <div class="stim-head">Shape</div>
+        <div class="stim-head">Color</div>
+        <div class="stim-head">Trials</div>
+
+        <div class="stim-label"><b>1</b>&ensp;standard</div>
+        <div>
+          <select id="shape1" class="shape-select">
+            <option value="X" selected>X</option><option value="O">O</option>
+            <option value="+">+</option><option value="svg">SVG file&hellip;</option>
+          </select>
+        </div>
+        <div class="colour-pair">
+          <span class="swatch" id="swatchStim1" title="Color of stimulus 1" style="background:#ffffff;"></span>
+          <input class="hex-input" id="hexStim1" type="text" maxlength="7" value="#ffffff">
+        </div>
+        <div><span id="count1Display" class="stim-count" title="The trials not taken by the other stimuli">&mdash;</span></div>
+        <div class="stim-svg span-all" id="svgRow1">
+          <label for="svgFile1" class="file-btn">Load SVG&hellip;</label>
+          <input id="svgFile1" type="file" accept=".svg,image/svg+xml" style="display:none">
+          <input id="svg1" type="hidden" value="">
+          <input id="svg1_name" type="hidden" value="">
+          <span id="svgInfo1" class="stim-note"></span>
+        </div>
+
+        <div class="stim-label"><b>2</b>&ensp;deviant</div>
+        <div>
+          <select id="shape2" class="shape-select">
+            <option value="X">X</option><option value="O" selected>O</option>
+            <option value="+">+</option><option value="svg">SVG file&hellip;</option>
+          </select>
+        </div>
+        <div class="colour-pair">
+          <span class="swatch" id="swatchStim2" title="Color of stimulus 2" style="background:#ffffff;"></span>
+          <input class="hex-input" id="hexStim2" type="text" maxlength="7" value="#ffffff">
+        </div>
+        <div><input id="count2" type="number" step="1" min="0" max="10000" value="40" required></div>
+        <div class="stim-svg span-all" id="svgRow2">
+          <label for="svgFile2" class="file-btn">Load SVG&hellip;</label>
+          <input id="svgFile2" type="file" accept=".svg,image/svg+xml" style="display:none">
+          <input id="svg2" type="hidden" value="">
+          <input id="svg2_name" type="hidden" value="">
+          <span id="svgInfo2" class="stim-note"></span>
+        </div>
+
+        <div class="stim-label">
+          <label class="inline" style="margin:0;" title="Add a third stimulus (for example a novel distractor)">
+            <input id="useStim3" type="checkbox"> <b>3</b>&ensp;third
+          </label>
+        </div>
+        <div class="stim3">
+          <select id="shape3" class="shape-select">
+            <option value="X">X</option><option value="O">O</option>
+            <option value="+" selected>+</option><option value="svg">SVG file&hellip;</option>
+          </select>
+        </div>
+        <div class="colour-pair stim3">
+          <span class="swatch" id="swatchStim3" title="Color of stimulus 3" style="background:#ffffff;"></span>
+          <input class="hex-input" id="hexStim3" type="text" maxlength="7" value="#ffffff">
+        </div>
+        <div class="stim3"><input id="count3" type="number" step="1" min="0" max="10000" value="20" required></div>
+        <div class="stim-svg span-all stim3" id="svgRow3">
+          <label for="svgFile3" class="file-btn">Load SVG&hellip;</label>
+          <input id="svgFile3" type="file" accept=".svg,image/svg+xml" style="display:none">
+          <input id="svg3" type="hidden" value="">
+          <input id="svg3_name" type="hidden" value="">
+          <span id="svgInfo3" class="stim-note"></span>
+        </div>
+      </div>
+
+      <div class="field-grid cols-3" style="margin-top:.8em;">
+        <div>
+          <label>Shape height (deg)</label>
+          <input id="shapeHeight" type="number" step="any" min="0.01" max="45" value="2" required
+                 title="Height of the drawn shape, not of the file's frame; the width follows the shape's own proportions">
+        </div>
+        <div>
+          <label>Stroke width (deg) <span style="opacity:.45; font-size:.88em;">X, O, +</span></label>
+          <input id="strokeWidth" type="number" step="any" min="0.001" max="10" value="0.25" required>
+        </div>
+        <div></div>
+        <div>
+          <label>Contrast (%) <span style="opacity:.45; font-size:.88em;">Michelson, vs background</span></label>
+          <input id="targetContrast" type="number" step="any" min="0" max="100" value="50">
+        </div>
+        <div style="display:flex; align-items:flex-end;">
+          <button type="button" class="secondary" id="applyContrastBtn"
+                  title="Set every stimulus color to this contrast against the background, keeping its hue">Apply to stimulus colors</button>
+        </div>
+      </div>
+      <div id="contrastReadout" style="margin-top:.55em; font-size:.8em; color:var(--text-mute); line-height:1.5;"></div>
+      <div id="shapeInfo" style="margin-top:.35em; font-size:.8em; color:var(--text-mute); line-height:1.5;"></div>
+    </div>
+
+    <!-- ══ SEQUENCE ══ -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">Sequence</div>
+      </div>
+      <div class="field-grid cols-3">
+        <div>
+          <label>Trials (all stimuli)</label>
+          <input id="nCycles" type="number" step="1" min="1" max="10000" value="200" required>
+        </div>
+        <div>
+          <label>Opening standards</label>
+          <input id="firstStandards" type="number" step="1" min="0" max="10000" value="5" required
+                 title="The sequence starts with at least this many standards">
+        </div>
+        <div>
+          <label>Standards before each non-standard</label>
+          <input id="minStandards" type="number" step="1" min="0" max="10000" value="2" required
+                 title="At least this many standards precede every deviant or third stimulus">
+        </div>
+        <div>
+          <label>Longest run of standards <span style="opacity:.45; font-size:.88em;">0 = no limit</span></label>
+          <input id="maxStandardRun" type="number" step="1" min="0" max="10000" value="0" required>
+        </div>
+        <div>
+          <label>Seed <span style="opacity:.45; font-size:.88em;">empty = new each session</span></label>
+          <input id="seed" type="number" step="1" min="1" max="2147483647" placeholder="drawn at start"
+                 title="The same seed rebuilds the same order; it is written into the log and the link">
+        </div>
+        <div style="display:flex; align-items:flex-end;">
+          <button type="button" class="secondary" id="newSeedBtn">New seed</button>
+        </div>
+      </div>
+      <div id="sequenceReadout" style="margin-top:.55em; font-size:.8em; color:var(--text-mute); line-height:1.5; word-break:break-all;"></div>
+    </div>
+
+    <!-- ══ TIMING ══ -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">Timing</div>
+      </div>
+      <div class="field-grid cols-3">
+        <div>
+          <label>On duration (ms)</label>
+          <input id="onDuration" type="number" step="1" min="1" max="600000" value="200" required>
+        </div>
+        <div>
+          <label>Off duration (ms)</label>
+          <input id="offDuration" type="number" step="1" min="1" max="600000" value="800" required>
+        </div>
+        <div>
+          <label>Off jitter (ms) <span style="opacity:.45; font-size:.88em;">0 = none</span></label>
+          <input id="offJitter" type="number" step="1" min="0" max="10000" value="0" required
+                 title="Adds a random 0 to this many ms to each off phase, in whole frames, drawn from the seed">
+        </div>
+        <div>
+          <label>Start delay (ms)</label>
+          <input id="startDelay" type="number" step="1" min="0" max="600000" value="3000" required>
+        </div>
+        <div class="span-all">
+          <label>Frame delivery rate <span style="opacity:.45; font-size:.88em;">measured</span></label>
+          <div id="fpsDisplay" style="
+            padding: .32em .5em; border-radius: .4em;
+            border: 1px solid rgba(255,255,255,.1);
+            background: rgba(0,0,0,.25); color: #7bc8e8;
+            font-size: .93em; font-family: monospace; letter-spacing: .04em;
+          ">— (measured at session start)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ SYNCHRONISATION ══ -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">Synchronization</div>
+      </div>
+      <div class="sync-rows" title="Each stimulus fires the sync dot in its own color, so the recording can tell them apart. Between triggers the dot is black.">
+        <div class="colour-pair sync-row" id="syncRow1">
+          <span class="sync-label" id="syncLabel1">Stimulus 1</span>
+          <span class="swatch" id="swatchSync1" title="Sync dot color, stimulus 1" style="background:#ffffff;"></span>
+          <input class="hex-input" id="hexSync1" type="text" maxlength="7" value="#ffffff">
+        </div>
+        <div class="colour-pair sync-row" id="syncRow2">
+          <span class="sync-label" id="syncLabel2">Stimulus 2</span>
+          <span class="swatch" id="swatchSync2" title="Sync dot color, stimulus 2" style="background:#ff0000;"></span>
+          <input class="hex-input" id="hexSync2" type="text" maxlength="7" value="#ff0000">
+        </div>
+        <div class="colour-pair sync-row stim3" id="syncRow3">
+          <span class="sync-label" id="syncLabel3">Stimulus 3</span>
+          <span class="swatch" id="swatchSync3" title="Sync dot color, stimulus 3" style="background:#00ff00;"></span>
+          <input class="hex-input" id="hexSync3" type="text" maxlength="7" value="#00ff00">
+        </div>
+        <div id="syncWarn" style="display:none; font-size:.8em; color:#e8a55a;"></div>
+      </div>
+      <div class="field-grid cols-4" style="margin-top:.7em;">
+        <div>
+          <label>Dot X (px)</label>
+          <input id="dot_x" type="number" min="0" max="30000" step="1" value="32">
+        </div>
+        <div>
+          <label>Dot Y (px)</label>
+          <input id="dot_y" type="number" min="0" max="30000" step="1" value="32">
+        </div>
+        <div>
+          <label>Dot size (px)</label>
+          <input id="dotSize" type="number" step="1" min="1" max="2000" value="32">
+        </div>
+        <div>
+          <label>Dot on-time (frames)</label>
+          <input id="syncDotFrames" type="number" step="1" min="1" max="600" value="2">
+        </div>
+        <div></div>
+        <div>
+          <label class="inline">
+            <input id="syncOnOnset" type="checkbox" checked>
+            Flash at stimulus onset
+          </label>
+        </div>
+        <div>
+          <label class="inline">
+            <input id="syncOnOffset" type="checkbox">
+            Flash at stimulus offset
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ FIXATION ══ -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">Fixation</div>
+        <div style="display:flex; gap:.7em; align-items:center;">
+          <div class="colour-pair">
+            <span>Fixation</span>
+            <span class="swatch" id="swatchFixation" title="Fixation color" style="background:#ff0000;"></span>
+            <input class="hex-input" id="hexFixation" type="text" maxlength="7" value="#ff0000">
+          </div>
+        </div>
+      </div>
+      <div class="field-grid cols-3">
+        <div>
+          <label class="inline">
+            <input id="showFixation" type="checkbox" checked>
+            Show fixation cross
+          </label>
+        </div>
+        <div>
+          <label>Radius (deg)</label>
+          <input id="fixationRadius" type="number" step="any" min="0.01" max="45" value="0.25">
+        </div>
+        <div>
+          <label>Thickness (px)</label>
+          <input id="fixationThickness" type="number" step="1" min="1" max="200" value="2">
+        </div>
+      </div>
+      <div class="t-faint" style="font-size:.78em; margin-top:.4em; line-height:1.45" >
+        The cross stays visible for the whole session and is drawn over the stimuli.
+      </div>
+    </div>
+
+  </form>
+
+  <!-- Reproducible link + APA-style report -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-title">Reproducible link</div>
+      <span class="section-meta">Click to copy</span>
+    </div>
+    <code id="urlPreview" class="url-block copyable"
+          title="Copy a link to reproduce the current settings">Copy a link to reproduce the current settings</code>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-title">APA-style report</div>
+      <span class="section-meta">Click to copy</span>
+    </div>
+    <div id="apaPreview" class="apa-block copyable"
+         title="Copy a stimulus description in APA-like style">Copy a stimulus description in APA-like style</div>
+  </div>
+
+  <!-- Footer -->
+  <div class="t-steel" style="margin-top:1.2em; padding-top:.7em; border-top: 1px solid rgba(255,255,255,.07); display:flex; justify-content:space-between; align-items:center; font-size:.72em; flex-wrap:wrap; gap:.3em" >
+    <span>Oddball VEP Stimulus &nbsp;&mdash;&nbsp; v1.2.0</span>
+    <span style="display:flex; gap:.9em; flex-wrap:wrap;"><a id="gateBackLink" href="vep_gate.html" target="vep_gate" style="color:#7bc8e8; text-decoration:none;">VEP Gate</a> &middot; <a href="vep_log_analyzer.html" target="vep_analyzer" style="color:#7bc8e8; text-decoration:none;">Log Analyzer</a> &middot; <a href="manual.html#oddball" target="vep_manual" style="color:#7bc8e8; text-decoration:none;">Help &amp; documentation</a></span>
+    <span>&copy; 2026 Jan Kremlacek &mdash; MIT License</span>
+  </div>
+
+</div><!-- end overlayInner -->
+</div><!-- end overlay -->
+
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   Helpers
+   ══════════════════════════════════════════════════════════════════════════ */
+const urlParams = new URLSearchParams(window.location.search);
+
+
+
+/* ── Colour utilities ── */
+function hsvToRgb(h, s, v) {
+  const f = n => { const k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); };
+  return { r: (f(5) * 255) | 0, g: (f(3) * 255) | 0, b: (f(1) * 255) | 0 };
+}
+
+function hexToRgb(hex) {
+  const h = hex.trim();
+  const m6 = h.match(/^#([0-9a-f]{6})$/i);
+  if (m6) { const n = parseInt(m6[1], 16); return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 }; }
+  const m3 = h.match(/^#([0-9a-f]{3})$/i);
+  if (m3) { const [r, g, b] = m3[1].split('').map(x => parseInt(x+x, 16)); return { r, g, b }; }
+  return null;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Colour picker
+   ══════════════════════════════════════════════════════════════════════════ */
+let pickerTarget = null, pickerSwatch = null;
+let pickerH = 0, pickerS = 0, pickerV = 1;
+
+function drawPickerWheel() {
+  const canvas = document.getElementById('pickerWheel');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height, cx = W / 2, cy = H / 2, R = cx - 2;
+  const img = ctx.createImageData(W, H), d = img.data;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const dx = x - cx, dy = y - cy, dist = Math.hypot(dx, dy);
+      if (dist > R) { d[(y*W+x)*4+3] = 0; continue; }
+      const h = ((Math.atan2(dy, dx) * 180 / Math.PI) + 360) % 360;
+      const { r, g, b } = hsvToRgb(h, dist / R, pickerV);
+      const i = (y * W + x) * 4;
+      d[i] = r; d[i+1] = g; d[i+2] = b; d[i+3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const angle = pickerH * Math.PI / 180;
+  const px = cx + pickerS * R * Math.cos(angle), py = cy + pickerS * R * Math.sin(angle);
+  ctx.strokeStyle = pickerV > 0.5 ? '#000' : '#fff';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2); ctx.stroke();
+}
+function updatePickerPreview() {
+  document.getElementById('pickerPreview').style.background = rgbToHex(hsvToRgb(pickerH, pickerS, pickerV));
+}
+function openPicker(swatchEl, colorObj) {
+  pickerTarget = colorObj; pickerSwatch = swatchEl;
+  const hsv = rgbToHsv(colorObj);
+  pickerH = hsv.h; pickerS = hsv.s; pickerV = hsv.v;
+  document.getElementById('pickerSlider').value = Math.round(pickerV * 100);
+  drawPickerWheel(); updatePickerPreview();
+  const picker = document.getElementById('colorPicker');
+  picker.style.display = 'block';
+  const rect = swatchEl.getBoundingClientRect(), pw = 178, ph = 260;
+  let left = rect.left, top = rect.bottom + 6;
+  if (left + pw > window.innerWidth)  left = window.innerWidth  - pw - 8;
+  if (top  + ph > window.innerHeight) top  = rect.top - ph - 6;
+  picker.style.left = left + 'px'; picker.style.top = top + 'px';
+}
+function closePicker() {
+  const col = hsvToRgb(pickerH, pickerS, pickerV);
+  pickerTarget.r = col.r; pickerTarget.g = col.g; pickerTarget.b = col.b;
+  if (pickerSwatch) {
+    pickerSwatch.style.background = rgbToHex(col);
+    const hexId = pickerSwatch.id.replace('swatch', 'hex');
+    const hexEl = document.getElementById(hexId);
+    if (hexEl) { hexEl.value = rgbToHex(col); hexEl.classList.remove('invalid'); }
+  }
+  document.getElementById('colorPicker').style.display = 'none';
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  /* picker wheel interaction */
+  document.getElementById('pickerWheel').addEventListener('mousedown', function(e) {
+    const moveHS = ev => {
+      const rect = this.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+      const R = rect.width / 2 - 2;
+      pickerH = ((Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180 / Math.PI) + 360) % 360;
+      pickerS = Math.min(Math.hypot(ev.clientX - cx, ev.clientY - cy), R) / R;
+      drawPickerWheel(); updatePickerPreview();
+    };
+    moveHS(e);
+    const up = () => { window.removeEventListener('mousemove', moveHS); window.removeEventListener('mouseup', up); };
+    window.addEventListener('mousemove', moveHS); window.addEventListener('mouseup', up);
+  });
+  document.getElementById('pickerSlider').addEventListener('input', function() {
+    pickerV = this.value / 100; drawPickerWheel(); updatePickerPreview();
+  });
+  document.getElementById('pickerClose').addEventListener('click', closePicker);
+
+  /* swatch + hex wiring */
+  const COLOUR_MAP = [
+    { swatchId: 'swatchStim1',    hexId: 'hexStim1',    col: colStim1 },
+    { swatchId: 'swatchStim2',    hexId: 'hexStim2',    col: colStim2 },
+    { swatchId: 'swatchStim3',    hexId: 'hexStim3',    col: colStim3 },
+    { swatchId: 'swatchBlank',    hexId: 'hexBlank',    col: colBlank },
+    { swatchId: 'swatchFixation', hexId: 'hexFixation', col: colFixation },
+    { swatchId: 'swatchSync1',    hexId: 'hexSync1',    col: colSync1 },
+    { swatchId: 'swatchSync2',    hexId: 'hexSync2',    col: colSync2 },
+    { swatchId: 'swatchSync3',    hexId: 'hexSync3',    col: colSync3 },
+  ];
+  COLOUR_MAP.forEach(({ swatchId, hexId, col }) => {
+    const swatchEl = document.getElementById(swatchId);
+    const hexEl    = document.getElementById(hexId);
+    swatchEl.addEventListener('click', () => openPicker(swatchEl, col));
+    const applyHex = () => {
+      const rgb = hexToRgb(hexEl.value);
+      if (!rgb) { hexEl.classList.add('invalid'); return; }
+      hexEl.classList.remove('invalid');
+      col.r = rgb.r; col.g = rgb.g; col.b = rgb.b;
+      swatchEl.style.background = rgbToHex(rgb);
+      hexEl.value = rgbToHex(rgb);
+      try { updateContrastReadout(); } catch (e) {}
+    };
+    hexEl.addEventListener('change', applyHex);
+    hexEl.addEventListener('keydown', e => { if (e.key === 'Enter') applyHex(); });
+    hexEl.addEventListener('input', () => hexEl.classList.toggle('invalid', !hexToRgb(hexEl.value)));
+  });
+
+  document.addEventListener('mousedown', e => {
+    const picker = document.getElementById('colorPicker');
+    if (picker.style.display === 'block' && !picker.contains(e.target) &&
+        !e.target.classList.contains('swatch') && !e.target.classList.contains('hex-input') &&
+        !e.target.classList.contains('colour-pair')) closePicker();
+  });
+
+  /* Auto-detect the screen width, in the same pixels everything else is
+     measured in.
+
+     That unit is the CSS pixel: the canvas is sized from window.innerWidth, all
+     drawing coordinates are canvas pixels, and pixelsPerDegree converts between
+     those and visual angle. window.screen.width reports CSS pixels too, so it is
+     used directly. Multiplying by devicePixelRatio would give the panel's native
+     resolution — a different unit from the one the geometry uses, and on a HiDPI
+     display that makes every angle wrong by the ratio: at dpr 2 a stimulus asked
+     for at 1 c/deg is presented at 0.5, and a mask asked for at 2 deg covers 4. */
+  const detectedPx = Math.round(window.screen.width);
+  const pxField = document.getElementById('screen_width_px');
+  pxField.value = detectedPx; pxField.placeholder = detectedPx;
+
+  /* GET param pre-fill — the map itself lives at module scope. */
+  for (const [key, id] of Object.entries(GET_TO_FIELD_ID)) {
+    if (!urlParams.has(key)) continue;
+    const el = document.getElementById(id);
+    if (!el) continue;
+    if (el.type === 'checkbox') el.checked = paramBool(key, el.checked);
+    else el.value = urlParams.get(key);
+  }
+// Re-apply hex colours: URL params filled the inputs but didn't fire events.
+  // Iterate COLOUR_MAP directly so col objects reflect the URL-supplied values.
+  COLOUR_MAP.forEach(function(entry) {
+    var el = document.getElementById(entry.hexId);
+    if (!el) return;
+    var rgb = hexToRgb(el.value);
+    if (!rgb) return;
+    entry.col.r = rgb.r; entry.col.g = rgb.g; entry.col.b = rgb.b;
+    var sw = document.getElementById(entry.swatchId);
+    if (sw) sw.style.background = el.value;
+  });
+  if (urlParams.has('note')) document.getElementById('noteField').value = urlParams.get('note');
+  initStimulusUI();
+  onStimulusFormChange();
+
+  /* fullscreen change */
+  /* ── Run controls + child/parent window wiring ── */
+  const _owBtn=document.getElementById('openWindowBtn');
+  if(_owBtn) _owBtn.onclick=function(){ openStandaloneWindow(); setTimeout(_refreshRunControls, 0); };
+  if(_isChild){
+    const ov=document.getElementById('overlay');
+    if(ov) ov.style.display='none';
+    /* The child window presents the stimulus; it has no settings UI, so hide
+       the run panel and drive it entirely from the parent's commands. */
+    const rp=document.querySelector('.run-panel'); if(rp) rp.style.display='none';
+    VEP.showChildWaiting(true);
+    _toParent({type:'vep_ready'});
+    _reportGeometryToParent();
+    _probeChildRefreshRate();
+    _watchScreenChanges();
+    /* Report geometry whenever this window's size or fullscreen state changes,
+       so the parent's Start gate updates the moment the operator maximizes it
+       (green button / own virtual desktop) or toggles fullscreen — not only on
+       p5's windowResized, which may not fire before the first Start. */
+    let _geomTimer = null;
+    const _reportGeomSoon = function () {
+      if (_geomTimer) clearTimeout(_geomTimer);
+      _geomTimer = setTimeout(_reportGeometryToParent, 60);
+    };
+    window.addEventListener('resize', _reportGeomSoon);
+    document.addEventListener('fullscreenchange', _reportGeomSoon);
+    /* Moving the window to another monitor need not change window.screen at all
+       — two displays of the same resolution are indistinguishable that way — so
+       re-measure on everything that accompanies such a move instead of relying
+       on the screen signature alone. */
+    window.addEventListener('resize', _probeChildRefreshRate);
+    document.addEventListener('fullscreenchange', _probeChildRefreshRate);
+    window.addEventListener('focus', _probeChildRefreshRate);
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) _probeChildRefreshRate();
+    });
+    /* Fullscreen affordance is only offered when the operator asked for it.
+       It can also be turned on later, from the parent -- see _applyFullscreenPref. */
+    _applyFullscreenPref(_childFullscreenWanted());
+  } else {
+  }
+  _initRunControls();
+
+  // Keep the "Exit fullscreen" button visible only while in fullscreen. If the
+  // browser leaves fullscreen unexpectedly during a running session (system
+  // dialog, Alt+Tab on some OSes), treat it as an abort — but debounce, because
+  // a transient exit during the transition must not abort.
+  let _fsExitTimer = null;
+  document.addEventListener('fullscreenchange', () => {
+    const inFs = !!document.fullscreenElement;
+    document.getElementById('exitFsBtn').style.display = inFs ? 'inline-block' : 'none';
+    if (_bgSafety && _bgSafety.markFrame) _bgSafety.markFrame();  // transition paused rAF; don't treat as a stall
+    if (inFs) { if (_fsExitTimer) { clearTimeout(_fsExitTimer); _fsExitTimer = null; } return; }
+    if (_fsExitTimer) clearTimeout(_fsExitTimer);
+    _fsExitTimer = setTimeout(() => {
+      _fsExitTimer = null;
+      /* Same ending as Ctrl+Space: the run is over either way, so the log must
+         be written either way. */
+      if (!document.fullscreenElement && state !== 'INIT') abortStimulation(true);
+    }, 400);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   URL builder
+   ══════════════════════════════════════════════════════════════════════════ */
+function updateURLPreview() {
+  const f = id => document.getElementById(id);
+  const p = new URLSearchParams();
+  /* Stimuli: shape, colour, count — and the SVG itself when one is used, so the
+     link alone rebuilds the condition. An SVG that is loaded but not selected
+     is left out: it is not part of what this link presents. */
+  [1, 2, 3].forEach(function (i) {
+    p.set('shape' + i, f('shape' + i).value);
+    p.set('hexStim' + i, f('hexStim' + i).value);
+    if (f('shape' + i).value === 'svg' && f('svg' + i).value) {
+      p.set('svg' + i, f('svg' + i).value);
+      if (f('svg' + i + '_name').value) p.set('svg' + i + '_name', f('svg' + i + '_name').value);
+    }
+  });
+  p.set('useStim3',         f('useStim3').checked);
+  p.set('count2',           f('count2').value);
+  p.set('count3',           f('count3').value);
+  p.set('hexBlank',         f('hexBlank').value);
+  p.set('shapeHeight',      f('shapeHeight').value);
+  p.set('strokeWidth',      f('strokeWidth').value);
+  p.set('nCycles',          f('nCycles').value);
+  p.set('firstStandards',   f('firstStandards').value);
+  p.set('minStandards',     f('minStandards').value);
+  p.set('maxStandardRun',   f('maxStandardRun').value);
+  if (f('seed').value) p.set('seed', f('seed').value);
+  p.set('onDuration',       f('onDuration').value);
+  p.set('offDuration',      f('offDuration').value);
+  p.set('offJitter',        f('offJitter').value);
+  p.set('startDelay',       f('startDelay').value);
+  p.set('screen_width_px',  f('screen_width_px').value);
+  p.set('screen_width_cm',  f('screen_width_cm').value);
+  p.set('view_distance_cm', f('view_distance_cm').value);
+  p.set('displayRefreshHz', f('displayRefreshHz').value);
+  p.set('useFullscreen',    f('useFullscreen').checked);
+  p.set('dot_x',            f('dot_x').value);
+  p.set('dot_y',            f('dot_y').value);
+  p.set('dotSize',          f('dotSize').value);
+  p.set('syncDotFrames',    f('syncDotFrames').value);
+  p.set('hexSync1',         f('hexSync1').value);
+  p.set('hexSync2',         f('hexSync2').value);
+  p.set('hexSync3',         f('hexSync3').value);
+  p.set('syncOnOnset',      f('syncOnOnset').checked);
+  p.set('syncOnOffset',     f('syncOnOffset').checked);
+  p.set('showFixation',     f('showFixation').checked);
+  p.set('fixationRadius',   f('fixationRadius').value);
+  p.set('fixationThickness',f('fixationThickness').value);
+  p.set('hexFixation',      f('hexFixation').value);
+  p.set('enableLogging',    f('enableLogging').checked);
+  const note = f('noteField').value.trim();
+  if (note) p.set('note', note);
+
+  // Propagate the gamma calibration (a URL param, not a form field) to the
+  // standalone/child window so it is calibrated exactly like the main window.
+  const _cal = gEncodeCalForURL(gammaCalibration);
+  if (_cal) p.set('cal', _cal);
+  if (_cal && gammaCalSource === 'file' && gammaCalFileName) p.set('cal_name', gammaCalFileName);
+
+  const url = window.location.href.split('?')[0] + '?' + p.toString();
+  const el  = document.getElementById('urlPreview');
+  el.textContent = url;
+  return url;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Stimuli, sequence and their readouts
+   ══════════════════════════════════════════════════════════════════════════ */
+const ROLE = { 1: 'standard', 2: 'deviant', 3: 'third' };
+const SHAPE_KINDS = ['X', 'O', '+', 'svg'];
+const SHAPE_WORDS = { X: 'X', O: 'O', '+': '+' };
+
+/** Is stimulus i (1..3) part of the session? 1 and 2 always are. */
+function stimActive(i) {
+  if (i === 3) { const el = document.getElementById('useStim3'); return !!(el && el.checked); }
+  return i === 1 || i === 2;
+}
+function activeStimuli() { return [1, 2, 3].filter(stimActive); }
+
+/** Counts as the form states them: stimulus 1 takes whatever the others leave. */
+function formCounts() {
+  const v = id => Math.floor(Number(document.getElementById(id).value));
+  const total = v('nCycles');
+  const n2 = v('count2') || 0, n3 = stimActive(3) ? (v('count3') || 0) : 0;
+  return { total: total, 1: total - n2 - n3, 2: n2, 3: n3 };
+}
+
+/** The cleaned SVG text of stimulus i, decoded from its hidden field, or ''. */
+function svgTextOf(i) {
+  const v = document.getElementById('svg' + i).value;
+  if (!v) return '';
+  const t = VEP.decodeTextFromURL(v);
+  return t || '';
+}
+function svgNameOf(i) { return document.getElementById('svg' + i + '_name').value || ''; }
+
+/** One-word description of stimulus i's shape, for labels and summaries. */
+function shapeLabel(i) {
+  const k = document.getElementById('shape' + i).value;
+  if (k === 'svg') return svgNameOf(i) || 'SVG';
+  return SHAPE_WORDS[k] || '?';
+}
+
+/* Decoded SVGs, kept per stimulus and keyed by the field value, so a session
+   start (or a parent's settings arriving in the stimulus window) only reloads
+   what actually changed. Loading is asynchronous; everything after it is not. */
+const _svgCache = { 1: { key: '', img: null, w: 0, h: 0, err: '' },
+                    2: { key: '', img: null, w: 0, h: 0, err: '' },
+                    3: { key: '', img: null, w: 0, h: 0, err: '' } };
+
+function _svgNeeded(i) {
+  return stimActive(i) && document.getElementById('shape' + i).value === 'svg';
+}
+/** True when every SVG the session needs is decoded for the current fields. */
+function svgImagesReady() {
+  return activeStimuli().every(function (i) {
+    if (!_svgNeeded(i)) return true;
+    const c = _svgCache[i];
+    return c.key === document.getElementById('svg' + i).value && !!c.img;
+  });
+}
+/** Decode the SVGs the session needs. Rejects with a message naming the stimulus. */
+function ensureSvgImages() {
+  return Promise.all(activeStimuli().map(function (i) {
+    if (!_svgNeeded(i)) return null;
+    const key = document.getElementById('svg' + i).value;
+    const c = _svgCache[i];
+    if (c.key === key && c.img) return null;
+    c.key = key; c.img = null; c.err = '';
+    const text = svgTextOf(i);
+    if (!text) { c.err = 'no SVG file loaded'; return Promise.reject(new Error('stimulus ' + i + ': ' + c.err)); }
+    const prep = VEP.prepareSVG(text);
+    if (!prep.ok) { c.err = prep.reason; return Promise.reject(new Error('stimulus ' + i + ': ' + c.err)); }
+    return VEP.loadSVGImage(prep.svg).then(function (img) {
+      if (c.key !== key) return;                      // superseded meanwhile
+      c.img = img; c.w = prep.width; c.h = prep.height;
+    }, function (e) {
+      c.err = e.message;
+      throw new Error('stimulus ' + i + ': ' + e.message);
+    });
+  }));
+}
+
+/** Read a chosen .svg file into stimulus i: checked, cleaned, stored in the form. */
+function loadSvgFile(i, file) {
+  const info = document.getElementById('svgInfo' + i);
+  const say = function (t, bad) { info.textContent = t; info.classList.toggle('bad', !!bad); };
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function (ev) {
+    const prep = VEP.prepareSVG(ev.target.result);
+    if (!prep.ok) { say(file.name + ': ' + prep.reason, true); return; }
+    document.getElementById('svg' + i).value = VEP.encodeTextForURL(prep.svg);
+    document.getElementById('svg' + i + '_name').value = file.name;
+    document.getElementById('shape' + i).value = 'svg';
+    onStimulusFormChange();
+  };
+  reader.onerror = function () { say('Could not read ' + file.name, true); };
+  reader.readAsText(file);
+}
+
+/** Show the SVG row of each stimulus that uses one, and what it holds. */
+function refreshSvgRows() {
+  [1, 2, 3].forEach(function (i) {
+    const row = document.getElementById('svgRow' + i);
+    const isSvg = document.getElementById('shape' + i).value === 'svg';
+    row.classList.toggle('shown', isSvg);
+    const info = document.getElementById('svgInfo' + i);
+    if (!isSvg) return;
+    const text = svgTextOf(i);
+    if (!text) { info.textContent = 'No file loaded yet.'; info.classList.add('bad'); return; }
+    const prep = VEP.prepareSVG(text);
+    if (!prep.ok) { info.textContent = (svgNameOf(i) || 'SVG') + ': ' + prep.reason; info.classList.add('bad'); return; }
+    const bytes = unescape(encodeURIComponent(prep.svg)).length;
+    info.textContent = (svgNameOf(i) || 'unnamed') + ' · ' + (bytes / 1024).toFixed(1) + ' kB · SHA-256 '
+      + VEP.sha256Hex(prep.svg).slice(0, 12) + '…';
+    info.classList.remove('bad');
+  });
+}
+
+/** Grey out stimulus 3 when it is not used, and hide its sync colour. */
+function refreshStim3() {
+  const on = stimActive(3);
+  document.querySelectorAll('.stim3').forEach(function (el) { el.classList.toggle('off', !on); });
+  document.getElementById('syncRow3').classList.toggle('off', !on);
+}
+
+/** The sync rows name the stimulus they belong to, its shape and its count. */
+function refreshSyncLabels() {
+  const c = formCounts();
+  [1, 2, 3].forEach(function (i) {
+    const el = document.getElementById('syncLabel' + i);
+    const n = c[i];
+    const pct = c.total > 0 && isFinite(n) ? ' (' + (100 * n / c.total).toFixed(1) + '%)' : '';
+    el.textContent = 'Stimulus ' + i + ' · ' + ROLE[i] + ' · ' + shapeLabel(i)
+                   + ' · n = ' + (isFinite(n) ? n : '?') + pct;
+  });
+  const n1 = document.getElementById('count1Display');
+  if (n1) n1.textContent = isFinite(c[1]) ? String(c[1]) : '—';
+  /* Stimuli sharing a trigger colour cannot be told apart in the recording. */
+  const warn = document.getElementById('syncWarn');
+  const dup = syncColourClashes();
+  warn.style.display = dup.length ? 'block' : 'none';
+  warn.textContent = dup.length ? '⚠ Stimuli ' + dup.join(', ')
+    + ' share a sync color, so the recording could not tell them apart. Start is refused until they differ.' : '';
+}
+
+/** Pairs of active stimuli whose sync colours are the same, as '1 and 2'. */
+function syncColourClashes() {
+  const act = activeStimuli(), out = [];
+  const hex = i => (hexToRgb(document.getElementById('hexSync' + i).value) ? rgbToHex(hexToRgb(document.getElementById('hexSync' + i).value)) : '?' + i);
+  for (let a = 0; a < act.length; a++)
+    for (let b = a + 1; b < act.length; b++)
+      if (hex(act[a]) === hex(act[b])) out.push(act[a] + ' and ' + act[b]);
+  return out;
+}
+
+/** The sequence the form describes, with the seed in the field (or 1, only to
+    test feasibility, when the seed is still to be drawn). */
+function formSequence(seedOverride) {
+  const c = formCounts();
+  const v = id => Number(document.getElementById(id).value);
+  const seedField = document.getElementById('seed').value;
+  return VEP.oddballSequence({
+    total: c.total, n2: c[2], n3: c[3],
+    firstStandards: v('firstStandards'), minStandards: v('minStandards'),
+    maxStandardRun: v('maxStandardRun'),
+    seed: seedOverride != null ? seedOverride : (seedField ? Number(seedField) : 1),
+  });
+}
+
+function refreshSequenceReadout() {
+  const el = document.getElementById('sequenceReadout');
+  const seq = formSequence();
+  if (!seq.ok) {
+    el.innerHTML = '<span style="color:#e8a55a">⚠ Not possible: ' + seq.reason + '.</span>';
+    return;
+  }
+  const c = seq.counts, total = seq.order.length;
+  const part = i => c[i] + ' ' + ROLE[i] + (c[i] === 1 ? '' : 's') + ' (' + (100 * c[i] / total).toFixed(1) + '%)';
+  let text = activeStimuli().map(part).join(' · ');
+  const seedField = document.getElementById('seed').value;
+  if (seedField) {
+    if (_autoSeed !== null && seedField === _autoSeed)
+      text += '<br>Seed drawn for the last session; the next Start draws a new one '
+            + '(type a seed, or press New seed, to keep an order).';
+    const sym = { 1: '·', 2: '2', 3: '3' };
+    const head = seq.order.slice(0, 80).map(x => sym[x]).join('');
+    text += '<br>Seed ' + seedField + ', first ' + Math.min(80, total) + ' trials: '
+          + '<span style="font-family:monospace">' + head + (total > 80 ? '…' : '') + '</span>'
+          + ' <span style="opacity:.6">(· standard)</span>';
+  } else {
+    text += '<br>The order is drawn when the session starts; its seed is then shown here, in the link and in the log.';
+  }
+  el.innerHTML = text;
+}
+
+/* A seed drawn automatically, remembered so the next Start draws a new one:
+   an empty field means "a new order for every session". A seed typed by the
+   operator, or set with New seed, is kept until changed. */
+let _autoSeed = null;
+
+/** Called once per Start in the settings window: draw a seed when the field is
+    empty or still holds the previous automatic one. The field then shows it,
+    and the link and the log carry it. */
+function drawSeedIfNeeded() {
+  const el = document.getElementById('seed');
+  const v = el.value.trim();
+  if (!v || !(Number(v) >= 1) || (_autoSeed !== null && v === _autoSeed)) {
+    el.value = String(VEP.randomSeed());
+    _autoSeed = el.value;
+  }
+  return Number(el.value);
+}
+
+/** The seed for the session being started (the stimulus window receives it
+    from the settings window; it only draws one if none arrived). */
+function sessionSeed() {
+  const v = Number(document.getElementById('seed').value);
+  return (v >= 1) ? Math.floor(v) : drawSeedIfNeeded();
+}
+
+/* Sizes of the shapes as they would be drawn now, for the readout and the
+   methods text. Computed off the session (it needs the SVGs decoded), and
+   cached so the APA builder can stay synchronous. */
+let _shapePreview = null;   // { ppd, 1:{w,h,area}|{err}, 2:..., 3:... }
+let _shapePreviewTimer = null;
+function refreshShapeInfo() {
+  if (_shapePreviewTimer) clearTimeout(_shapePreviewTimer);
+  _shapePreviewTimer = setTimeout(function () {
+    _shapePreviewTimer = null;
+    ensureSvgImages().catch(function () {}).then(function () {
+      readParams();
+      const hpx = shapeHeight_deg * pixelsPerDegree, spx = strokeWidth_deg * pixelsPerDegree;
+      const out = { ppd: pixelsPerDegree };
+      activeStimuli().forEach(function (i) {
+        const kind = document.getElementById('shape' + i).value;
+        let m;
+        if (kind === 'svg') {
+          const c = _svgCache[i];
+          m = c.img ? VEP.svgShapeMask(c.img, c.w, c.h, hpx) : { ok: false, reason: c.err || 'no SVG file loaded' };
+        } else {
+          m = VEP.builtinShapeMask(kind, hpx, spx);
+        }
+        out[i] = m.ok ? { w: m.w, h: m.h, area: m.area } : { err: m.reason };
+      });
+      _shapePreview = out;
+      showShapeInfo();
+      try { buildAPADescription(); } catch (e) {}
+    });
+  }, 120);
+}
+
+function showShapeInfo() {
+  const el = document.getElementById('shapeInfo');
+  if (!el || !_shapePreview) return;
+  const ppd = _shapePreview.ppd, lines = [], warn = [];
+  const fix = rgbToHex(colFixation);
+  activeStimuli().forEach(function (i) {
+    const s = _shapePreview[i];
+    if (!s) return;
+    if (s.err) { warn.push('Stimulus ' + i + ': ' + s.err); return; }
+    lines.push(i + ' ' + shapeLabel(i) + ': ' + s.w + ' × ' + s.h + ' px ('
+      + (s.w / ppd).toFixed(2) + '° × ' + (s.h / ppd).toFixed(2) + '°), '
+      + s.area + ' px drawn');
+    if (s.area >= 0.97 * s.w * s.h && s.w * s.h > 16)
+      warn.push('Stimulus ' + i + ' fills its whole box — does the SVG have a background rectangle?');
+    if (showFixation && rgbToHex(colStims[i - 1]) === fix)
+      warn.push('Stimulus ' + i + ' has the fixation color, so the cross is invisible on it.');
+  });
+  const areas = activeStimuli().map(i => _shapePreview[i]).filter(s => s && !s.err).map(s => s.area);
+  if (areas.length > 1) {
+    const r = Math.max.apply(null, areas) / Math.min.apply(null, areas);
+    if (r > 1.05) lines.push('Drawn areas differ by a factor of ' + r.toFixed(2)
+      + ', so the stimuli also differ in the total light they emit.');
+  }
+  el.innerHTML = lines.map(t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;')).join('<br>')
+    + (warn.length ? '<br><span style="color:#e8a55a">' + warn.map(t => '⚠ '
+       + t.replace(/&/g, '&amp;').replace(/</g, '&lt;')).join('<br>') + '</span>' : '');
+}
+
+/**
+ * What would stop a session from starting, before anything is presented:
+ * an impossible sequence, a missing or unusable SVG, an unknown shape, sync
+ * colours that cannot be told apart. Checked by Start, by the stimulus window
+ * when a session arrives, and listed on the autostart screen.
+ */
+function startProblems() {
+  const p = [];
+  const seq = formSequence();
+  if (!seq.ok) p.push('Sequence not possible: ' + seq.reason + '.');
+  activeStimuli().forEach(function (i) {
+    const k = document.getElementById('shape' + i).value;
+    if (SHAPE_KINDS.indexOf(k) < 0) { p.push('Stimulus ' + i + ': unknown shape.'); return; }
+    if (k !== 'svg') return;
+    const text = svgTextOf(i);
+    if (!text) { p.push('Stimulus ' + i + ': no SVG file loaded.'); return; }
+    const prep = VEP.prepareSVG(text);
+    if (!prep.ok) p.push('Stimulus ' + i + ': ' + prep.reason + '.');
+  });
+  const dup = syncColourClashes();
+  if (dup.length) p.push('Stimuli ' + dup.join(', ') + ' share a sync color.');
+  return p;
+}
+
+/** Everything that follows a change of the stimulus, sequence or sync fields. */
+function onStimulusFormChange() {
+  readParams();
+  refreshStim3();
+  refreshSvgRows();
+  refreshSyncLabels();
+  refreshSequenceReadout();
+  updateContrastReadout();
+  refreshShapeInfo();
+  try { updateURLPreview(); } catch (e) {}
+  try { buildAPADescription(); } catch (e) {}
+}
+
+function initStimulusUI() {
+  [1, 2, 3].forEach(function (i) {
+    const fi = document.getElementById('svgFile' + i);
+    fi.addEventListener('change', function (ev) {
+      if (ev.target.files && ev.target.files[0]) loadSvgFile(i, ev.target.files[0]);
+      ev.target.value = '';
+    });
+  });
+  document.getElementById('newSeedBtn').addEventListener('click', function () {
+    document.getElementById('seed').value = String(VEP.randomSeed());
+    _autoSeed = null;                       // chosen deliberately: keep it
+    onStimulusFormChange();
+  });
+  const form = document.getElementById('paramForm');
+  let t = null;
+  const soon = function () { if (t) clearTimeout(t); t = setTimeout(onStimulusFormChange, 80); };
+  form.addEventListener('input', soon);
+  form.addEventListener('change', soon);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   APA-style stimulus description
+   ══════════════════════════════════════════════════════════════════════════ */
+/* Which renderer will actually be used, for the methods text. During a session
+   `useWebGL` is authoritative; before one runs it is still false, so fall back
+   to the detection result (the same signal that drives the on-screen renderer
+   note) and this file's default gate (WebGL unless ?webgl=0). */
+function _effectiveWebGL() {
+  if (_rendererDecided) {
+    if (_childWin && !_childWin.closed && _childUseWebGL !== null) return _childUseWebGL;
+    return useWebGL;
+  }
+  if (useWebGL) return true;
+  if (urlParams.get('webgl') === '0') return false;
+  return !!(webglTestResult && webglTestResult.passed);
+}
+
+
+function buildAPADescription() {
+  const f  = id => document.getElementById(id);
+  const fv = id => +f(id).value;
+  const fb = id => f(id).checked;
+
+  const act      = activeStimuli();
+  const counts   = formCounts();
+  const nTrials  = counts.total;
+  const onDur    = fv('onDuration');
+  const offDur   = fv('offDuration');
+  const jitter   = fv('offJitter');
+  const startDel = fv('startDelay');
+  const viewDist = fv('view_distance_cm');
+  const scrWpx   = fv('screen_width_px');
+  const scrWcm   = fv('screen_width_cm');
+  const ppd      = +(2 * viewDist * Math.tan(0.5 * Math.PI / 180) / (scrWcm / scrWpx)).toFixed(1);
+  /* The rate of the surface that presents the stimulus — the stimulus window
+     when one is open, which may be another monitor. */
+  const fpsInfo  = presentationFPS();
+  const fps      = fpsInfo.hz > 0 ? fpsInfo.hz : NaN;
+  /* Read from the form, not from the session variables: those are only set when
+     a session starts in this window, so before that — and always when the
+     stimulus runs in a separate window — they would still hold the defaults. */
+  const dotSz    = Math.max(1, Math.round(fv('dotSize')) || 32);
+  const hDeg     = fv('shapeHeight');
+  const strokeDeg = fv('strokeWidth');
+  const parts = [];
+
+  const shapeWords = function (i) {
+    const k = f('shape' + i).value;
+    if (k === 'X') return 'an X (two diagonal strokes)';
+    if (k === 'O') return 'an O (a ring)';
+    if (k === '+') return 'a plus sign (two perpendicular bars)';
+    const text = svgTextOf(i), prep = text ? VEP.prepareSVG(text) : null;
+    const sha = (prep && prep.ok) ? ', SHA-256 ' + VEP.sha256Hex(prep.svg).slice(0, 16) : '';
+    return 'the shape in ' + (svgNameOf(i) || 'an SVG file') + ' (vector file' + sha + ')';
+  };
+  const builtinUsed = act.some(i => f('shape' + i).value !== 'svg');
+
+  // ── Stimuli ───────────────────────────────────────────────────────────────
+  const listed = act.map(i => (i === 1 ? 'a standard, ' : i === 2 ? 'a deviant, ' : 'a third stimulus, ')
+                              + shapeWords(i));
+  parts.push(
+    `An oddball visual evoked potential (VEP) paradigm was presented with ${act.length} stimuli: `
+    + (listed.length > 2 ? listed.slice(0, -1).join('; ') + '; and ' + listed[listed.length - 1]
+                         : listed.join(', and ')) + '. '
+    + `Each stimulus was drawn at the center of the screen as a binary shape, without anti-aliasing, `
+    + `so that it had exactly two luminance levels, its own and that of the background. `
+    + `The drawn height of every shape was ${hDeg} deg of visual angle (${Math.round(hDeg * ppd)} px)`
+    + (builtinUsed ? `; the strokes of the built-in shapes were ${strokeDeg} deg (${(strokeDeg * ppd).toFixed(1)} px) wide` : '')
+    + (act.some(i => f('shape' + i).value === 'svg') ? '; shapes from vector files kept their own aspect ratio' : '')
+    + '.' + (function () {
+        if (!_shapePreview) return '';
+        const sz = act.map(i => _shapePreview[i]).filter(s => s && !s.err);
+        if (sz.length !== act.length) return '';
+        let out = ' The drawn shapes measured ' + act.map(function (i) {
+          const s = _shapePreview[i];
+          return `${s.w} × ${s.h} px (${s.area} px drawn) for stimulus ${i}`;
+        }).join(', ') + '.';
+        const areas = sz.map(s => s.area);
+        const r = Math.max.apply(null, areas) / Math.min.apply(null, areas);
+        if (r > 1.05) out += ` The drawn areas differed by a factor of ${r.toFixed(2)}, so the stimuli `
+          + `also differed in the total light they emitted.`;
+        return out;
+      })()
+  );
+  parts.push(
+    'The stimuli were drawn in ' + act.map(i => `${f('hexStim' + i).value} (stimulus ${i})`).join(', ')
+    + ` on a uniform background of ${f('hexBlank').value}, which also filled the screen between stimuli.`
+  );
+
+  // ── Sequence ──────────────────────────────────────────────────────────────
+  const seedTxt = f('seed').value;
+  const firstStd = fv('firstStandards'), minStd = fv('minStandards'), maxRun = fv('maxStandardRun');
+  parts.push(
+    `The sequence comprised ${nTrials} trials: ` + act.map(i =>
+      `${counts[i]} ${ROLE[i]} trial${counts[i] === 1 ? '' : 's'} (${(100 * counts[i] / nTrials).toFixed(1)}%)`
+    ).join(', ') + '. '
+    + `Their order was pseudorandom, generated from ` + (seedTxt ? `seed ${seedTxt}` : 'a seed drawn at the start of the session and recorded in the log')
+    + ` with a deterministic generator (mulberry32), so the same seed reproduces the same order. `
+    + (firstStd > 0 ? `The first ${firstStd} trials were standards, and ` : '')
+    + `at least ${minStd} standard${minStd === 1 ? '' : 's'} preceded every non-standard stimulus`
+    + (maxRun > 0 ? `; no more than ${maxRun} standards occurred in a row` : '')
+    + `. Among the orders satisfying these constraints, every order was equally likely.`
+  );
+
+  // ── Timing ────────────────────────────────────────────────────────────────
+  const meanTrial = onDur + offDur + jitter / 2;
+  parts.push(
+    `Each stimulus was shown for ${onDur} ms and followed by the background alone for ${offDur} ms`
+    + (jitter > 0 ? `, extended on each trial by a random interval of 0–${jitter} ms drawn uniformly in whole `
+                  + `frames from the same seed` : '')
+    + ` (total stimulation time approximately ${Math.round(nTrials * meanTrial / 1000)} s).`
+  );
+  if (startDel > 0) {
+    parts.push(`A background-only interval of ${startDel} ms preceded the first trial, `
+      + `and an interval of the same length followed the last.`);
+  }
+
+  // ── Display ───────────────────────────────────────────────────────────────
+  const fpsStr = fpsPhrase(fpsInfo);
+  const _fieldGeom = VEP.stimulusField({
+    childOpen        : !!(_childWin && !_childWin.closed),
+    childW           : _childCanvasW,
+    childH           : _childCanvasH,
+    childFullscreen  : _childFullscreen,
+    sessionW         : sessionCanvasWidth_px,
+    sessionH         : sessionCanvasHeight_px,
+    sessionFullscreen: useFullscreen,
+    formFullscreen   : fb('useFullscreen'),
+  });
+  const canvW = _fieldGeom.w, canvH = _fieldGeom.h;
+  const modeStr = _fieldGeom.fullscreen ? 'in fullscreen mode'
+    : `in a windowed browser (window size ${canvW} × ${canvH} px)`;
+  parts.push(
+    `The stimulus was rendered on a ${canvW} × ${canvH} px canvas ${modeStr}, `
+    + `subtending ${(canvW / ppd).toFixed(1)} × ${(canvH / ppd).toFixed(1)} deg of visual angle `
+    + `(±${(canvW / ppd / 2).toFixed(1)} deg horizontally from fixation). `
+    + `The display was ${scrWcm} cm wide, viewed from ${viewDist} cm, `
+    + `corresponding to approximately ${ppd} px/deg. `
+    + `Animation frames were delivered at ${fpsStr}; all frame-locked durations are computed against that rate.`
+    + (function () {
+        const dHz = declaredRefreshHz();
+        if (!dHz) return '';
+        let out = ` The presentation display was set to ${dHz} Hz.`;
+        if (isFinite(fps) && fps > 0 && Math.abs(fps / dHz - 1) > 0.05) {
+          out += ` These differ: the browser paced the stimulus at a rate other than that of `
+               + `the display presenting it, so the effective temporal resolution was `
+               + `${Math.min(fps, dHz).toFixed(1)} Hz, the slower of the two.`;
+        }
+        return out;
+      })()
+  );
+
+  // ── Sync ──────────────────────────────────────────────────────────────────
+  const dotFrames = fv('syncDotFrames');
+  const ev = [];
+  if (fb('syncOnOnset'))  ev.push('stimulus onset');
+  if (fb('syncOnOffset')) ev.push('stimulus offset');
+  if (ev.length) {
+    parts.push(
+      `A ${dotSz} × ${dotSz} px photodiode trigger patch at screen position (${fv('dot_x')}, ${fv('dot_y')}) px `
+      + `lit for ${dotFrames} frame${dotFrames > 1 ? 's' : ''} at ${ev.join(' and ')}, in a color identifying `
+      + `the stimulus: ` + act.map(i => VEP.syncColourText(hexToRgb(f('hexSync' + i).value)) + ` for the ${ROLE[i]}`).join(', ')
+      + `. Between triggers the patch was black.`
+    );
+  }
+
+  // ── Fixation ──────────────────────────────────────────────────────────────
+  if (fb('showFixation')) {
+    const fixRad = fv('fixationRadius');
+    parts.push(
+      `A fixation cross (arm radius ${fixRad} deg / ${Math.round(fixRad * ppd)} px, `
+      + `${fv('fixationThickness')} px thick, color ${f('hexFixation').value}) was superimposed at the `
+      + `screen center throughout the session, drawn over the stimuli.`
+    );
+  }
+
+  // ── Calibration and contrast ─────────────────────────────────────────────
+  const L = stimulusLuminances();
+  if (gammaCalibration) {
+    const Lmax_s = gammaFns && gammaFns.L_max ? gammaFns.L_max.toFixed(1) : '?';
+    const Lmin_s = gammaFns && gammaFns.L_min != null ? gammaFns.L_min.toFixed(2) : '?';
+    let s = `Colors were evaluated through a display calibration (model: ${gammaCalibration.model}; `
+      + `L_max = ${Lmax_s} cd/m², L_min = ${Lmin_s} cd/m²; calibration date: `
+      + `${formatCalibrationDate(new Date(gammaCalibration.calibration_date))}).`;
+    if (L) {
+      s += ' Michelson contrast in luminance against the background was '
+        + act.map(i => `${L.stim[i].contrast != null ? (L.stim[i].contrast * 100).toFixed(1) + '%' : '?'} for stimulus ${i}`).join(', ') + '.';
+      if (luminanceIsMeasured()) {
+        s += ' Luminances estimated from the measured transfer function were '
+          + act.map(i => `${L.stim[i].L.toFixed(1)} cd/m² (stimulus ${i})`).join(', ')
+          + ` and ${L.L_background.toFixed(1)} cd/m² for the background; these are estimates derived `
+          + `from the display calibration, not photometric measurements of this session.`;
+        s += channelsWereMeasured()
+          ? ' The relative luminance of the red, green and blue primaries was measured individually.'
+          : ' The relative luminance of the primaries was not measured; it was taken from the BT.709/sRGB '
+            + 'coefficients (0.2126, 0.7152, 0.0722), applied to linear light (Rec. ITU-R BT.709-6, 2015; '
+            + 'IEC 61966-2-1:1999).';
+      }
+    }
+    parts.push(s);
+  } else if (L) {
+    parts.push(
+      'No display calibration was in force; sRGB was assumed, so luminances are relative and none is '
+      + 'reported. Michelson contrast against the background under that assumption was '
+      + act.map(i => `${L.stim[i].contrast != null ? (L.stim[i].contrast * 100).toFixed(1) + '%' : '?'} for stimulus ${i}`).join(', ') + '.'
+    );
+  }
+
+  /* ── Renderer ── */
+  parts.push(
+    _effectiveWebGL()
+      ? 'Stimuli were rendered using a WebGL 2 fragment shader reading the precomputed shape masks.'
+      : 'Stimuli were rendered using the Canvas 2D API from precomputed shape masks.'
+  );
+
+  /* ── Pause ── */
+  const _pauseEvts = logData.filter(function (e) { return e.event === 'pause'; });
+  if (_pauseEvts.length > 0)
+    parts.push('The session was paused ' + _pauseEvts.length
+      + ' time' + (_pauseEvts.length > 1 ? 's' : '') + ' by the operator.');
+
+  const text = parts.join('\n\n');
+  const el = document.getElementById('apaPreview');
+  el.textContent = text;
+  return text;
+}
+
+
+
+document.addEventListener('click', e => {
+  if (e.target.id === 'urlPreview') copyURLPreview();
+  if (e.target.id === 'apaPreview') copyAPADescription();
+});
+
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Gamma calibration module
+   The calibration behaves like every other parameter on this page: it arrives
+   in the URL ('cal=<base64-json>', normally written by vep_gate.html) or from a
+   calibration .json loaded here, which overrides the URL. Whatever is active is
+   re-encoded into the generated URL, so the stimulus window and any copied link
+   carry it too.
+   No localStorage: the key 'vep_gamma_calibration' is read and written by
+   vep_gate.html alone, so a stored calibration is chosen in exactly one place
+   and this page can never silently disagree with it.
+   Warning after GAMMA_WARN_DAYS days.
+   ══════════════════════════════════════════════════════════════════════════ */
+const GAMMA_WARN_DAYS = 30;
+
+let gammaCalibration  = null;   // active calibration object (null → sRGB assumed)
+let gammaCalSource    = 'none'; // 'url' | 'file' | 'none' — provenance, logged
+let gammaCalFileName  = '';     // name of the originating .json, when known
+let gammaCalPinned    = false;  // set explicitly (file here, or pushed by the parent):
+                                // must survive a re-read of this window's URL
+let gammaFns          = null;   // { R:{fwd,inv}, G:{fwd,inv}, B:{fwd,inv}, grey:{fwd,inv}, L_max, L_min }
+
+/** Build gamma functions from a calibration object (or null for sRGB). */
+const gBuildGammaFns   = VEP.buildGammaFns;
+
+/** URL-safe base64 decode for the 'cal' query parameter. */
+const gDecodeCalFromURL= VEP.decodeCalFromURL;
+
+/** URL-safe base64 encode for the 'cal' query parameter. */
+const gEncodeCalForURL = VEP.encodeCalForURL;
+
+/**
+ * Load the calibration from the URL query parameter 'cal=<base64-json>', with
+ * 'cal_name' carrying the name of the file it originally came from.
+ * A calibration loaded from a file on this page wins and is preserved: this
+ * function also runs when a session starts, and must not discard it. Reload
+ * the page to go back to the calibration carried by the URL.
+ */
+function loadGammaCalibration() {
+  /* Pinned means the calibration was set deliberately — loaded from a file here
+     or handed over by the parent at Start. That includes deliberately having
+     none: falling back to this window's URL would silently reinstate a stale
+     calibration the operator had just cleared. */
+  if (gammaCalPinned) {
+    gammaFns = gBuildGammaFns(gammaCalibration);
+    return;
+  }
+  let cal = null, calName = '';
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const calStr = params.get('cal');
+    if (calStr) cal = gDecodeCalFromURL(calStr);
+    calName = params.get('cal_name') || '';
+  } catch(e) {}
+  gammaCalibration = cal;
+  gammaCalFileName = cal ? calName : '';
+  gammaCalSource   = cal ? (calName ? 'file' : 'url') : 'none';
+  gammaFns = gBuildGammaFns(gammaCalibration);
+}
+
+/**
+ * Take the calibration the parent had active when Start was pressed. Without
+ * this the stimulus window would keep whatever was in its own URL at the moment
+ * it was opened, so a calibration loaded afterwards would not reach it and the
+ * log would still name the old source until the window was reopened.
+ */
+function _applyCalibrationFromParent(enc, name) {
+  const cal = enc ? gDecodeCalFromURL(enc) : null;
+  gammaCalibration  = cal;
+  gammaCalFileName  = cal ? (name || '') : '';
+  gammaCalSource    = cal ? (name ? 'file' : 'url') : 'none';
+  gammaCalPinned    = true;   // authoritative: do not re-read this window's URL
+  gammaFns          = gBuildGammaFns(gammaCalibration);
+}
+
+/**
+ * Load a calibration .json exported by display_calibration.html. It replaces
+ * the URL calibration and is written straight back into the generated URL, so
+ * the stimulus window and any link copied afterwards use it as well.
+ */
+function loadCalibrationFromFile(file) {
+  const msgEl = document.getElementById('calFileMsg');
+  function say(text, colour) {
+    if (msgEl) { msgEl.textContent = text; msgEl.style.color = colour; }
+  }
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function (ev) {
+    let cal = null;
+    try { cal = JSON.parse(ev.target.result); } catch (e) { cal = null; }
+    if (!cal || typeof cal !== 'object' || !cal.model || cal.L_max_cdm2 == null) {
+      say('Invalid calibration file: expected the .json saved by display_calibration.html.', '#e8a55a');
+      return;
+    }
+    gammaCalibration  = cal;
+    gammaCalSource    = 'file';
+    gammaCalFileName  = file.name || '';
+    gammaCalPinned    = true;
+    gammaFns          = gBuildGammaFns(gammaCalibration);
+    say('Calibration loaded.', '#59c08b');   // the name itself is shown in the status line
+    updateCalibrationStatusEl('calibrationStatus');
+    try { onStimulusFormChange(); } catch (e) {}
+    try { updateURLPreview();    } catch (e) {}
+    try { buildAPADescription(); } catch (e) {}
+  };
+  reader.onerror = function () { say('Could not read the file.', '#e8a55a'); };
+  reader.readAsText(file);
+}
+
+
+
+
+
+/** Luminance of the background and of each active stimulus, with each
+    stimulus's Michelson contrast against the background. Uses the shared model:
+    each channel from its own dark point, summed, normalised to measured white.
+    Without a calibration the figures rest on the sRGB assumption and are
+    relative, but the contrasts are still ratios and still meaningful. */
+function stimulusLuminances() {
+  if (!gammaFns) return null;
+  const Lb = VEP.luminanceOfRGB(gammaFns, colBlank);
+  const out = { L_background: Lb, stim: {} };
+  activeStimuli().forEach(function (i) {
+    const L = VEP.luminanceOfRGB(gammaFns, colStims[i - 1]);
+    out.stim[i] = { L: L, contrast: VEP.michelson(L, Lb) };
+  });
+  return out;
+}
+
+
+
+
+/** Short note for the readout: never leave the basis of the numbers implicit. */
+function channelBasisNote() {
+  return channelsWereMeasured()
+    ? ' · R/G/B measured'
+    : ' · R/G/B assumed from sRGB primaries';
+}
+
+/** Refresh the achieved-contrast line. It always describes the colours as they
+    are, so it stays honest after a manual edit. */
+function updateContrastReadout(extra, extraColour) {
+  const el = document.getElementById('contrastReadout');
+  if (!el) return;
+  const L = stimulusLuminances();
+  if (!L) { el.textContent = ''; return; }
+  const meas = luminanceIsMeasured();
+  let text = 'Current colors, contrast against the background: '
+    + activeStimuli().map(function (i) {
+        const s = L.stim[i];
+        return i + ' ' + (s.contrast != null ? (s.contrast * 100).toFixed(1) + '%' : '—')
+          + (meas ? ' (' + s.L.toFixed(1) + ' cd/m²)' : '');
+      }).join(', ');
+  if (meas) text += ' · background ' + L.L_background.toFixed(1) + ' cd/m² (estimated)';
+  else if (gammaCalibration) text += ' · luminances modeled, not measured';
+  else text += ' · sRGB assumed, no calibration';
+  text += channelBasisNote();
+  el.textContent = extra ? extra + ' — ' + text : text;
+  el.style.color = (extra && extraColour) ? extraColour : 'var(--text-mute)';
+}
+
+
+/** Set every active stimulus colour to the requested Michelson contrast against
+    the background. The background stays where it is — all stimuli share it —
+    and each colour slides along its own ray, keeping its hue and its side of
+    the background. Nothing stores the request: the colours remain the record. */
+function applyContrastToColours() {
+  const cEl = document.getElementById('targetContrast');
+  if (!cEl || !gammaFns) return;
+  const C = Number(cEl.value) / 100;
+  const failed = [];
+  activeStimuli().forEach(function (i) {
+    const res = VEP.solveColourForContrast(gammaFns,
+      { colour: colStims[i - 1], background: colBlank, contrast: C });
+    if (res.ok) setColourPair('hexStim' + i, 'swatchStim' + i, colStims[i - 1], res.rgb);
+    else failed.push(i + ': ' + res.reason);
+  });
+  if (failed.length) updateContrastReadout('Not applied to ' + failed.join('; '), '#e8a55a');
+  else updateContrastReadout('Applied', '#59c08b');
+  try { updateURLPreview();    } catch (e) {}
+  try { buildAPADescription(); } catch (e) {}
+}
+
+/**
+ * Link back to the gate carrying the shared parameters this page currently
+ * holds, plus the calibration.
+ *
+ * The gate is reused rather than reopened, which means following a bare link
+ * would re-navigate an open gate and wipe the settings of the session: the
+ * gate's fields are not stored anywhere, they only exist in its form. Handing
+ * them back in the query string turns that from a loss into something useful —
+ * the gate returns showing the parameters actually in use.
+ */
+function buildGateBackURL() {
+  const p = new URLSearchParams();
+  /* Exactly the parameters the gate owns; everything else stays here. */
+  const SHARED = ['screen_width_px', 'screen_width_cm', 'view_distance_cm', 'displayRefreshHz', 'dot_x', 'dot_y', 'dotSize', 'hexSync1', 'hexSync2', 'hexSync3', 'syncDotFrames', 'useFullscreen', 'enableLogging'];
+  SHARED.forEach(function (id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    p.set(id, (el.type === 'checkbox') ? String(el.checked) : el.value);
+  });
+  const noteEl = document.getElementById('noteField');
+  if (noteEl && noteEl.value) p.set('note', noteEl.value);
+  try {
+    const cal = gEncodeCalForURL(gammaCalibration);
+    if (cal) {
+      p.set('cal', cal);
+      if (gammaCalSource === 'file' && gammaCalFileName) p.set('cal_name', gammaCalFileName);
+    }
+  } catch (e) {}
+  return 'vep_gate.html?' + p.toString();
+}
+
+
+/* ── Frame delivery rate of the surface that presents the stimulus ────────
+   The methods text, the refresh-mismatch note and every duration derived from
+   the frame rate must describe the display the subject looks at. When a
+   separate stimulus window is open — typically on a second monitor — that is
+   the stimulus window's rate, not this window's: the two monitors may run at
+   different rates (60 against 120 Hz is common), and this window's own figure
+   would then describe the operator's screen.
+   So the two are kept apart, each with how it was obtained:
+     this window      exact after a local session (measuredFPS), otherwise the
+                      estimate taken when the page loaded;
+     stimulus window  exact from its session start, or the estimate it sends
+                      while idle. The most recent report wins, so moving that
+                      window to another display after a run replaces the old
+                      exact figure with a fresh estimate instead of keeping a
+                      rate the subject's display no longer runs at.
+   This window's own measuredFPS is never overwritten with the stimulus
+   window's figure: it times a local run, and must stay what it measured. */
+let _localProbeFPS = 0;
+let _childFPS = { hz: 0, exact: false };
+
+
+
+/** The frame-rate box on the settings panel, from the same source. */
+function refreshFpsDisplay() {
+  const el = document.getElementById('fpsDisplay');
+  if (!el) return;
+  const f = presentationFPS();
+  const where = (f.where === 'child') ? 'stimulus display' : 'this display';
+  if (!(f.hz > 0)) {
+    el.textContent = (f.where === 'child') ? '— (stimulus window: measuring…)'
+                                           : '— (measured at session start)';
+    return;
+  }
+  el.textContent = f.exact
+    ? f.hz.toFixed(1) + ' Hz' + (f.where === 'child' ? ' (stimulus display, measured)' : '')
+    : '≈ ' + Math.round(f.hz) + ' Hz (' + where + ') · exact rate measured at session start';
+}
+
+
+let _childScreenW = 0;   // width of the screen the presentation window is on (CSS px)
+
+
+/** Update a UI element with the current calibration status. */
+
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Session state
+   ══════════════════════════════════════════════════════════════════════════ */
+let state            = 'INIT';   // INIT | MEASURE | DELAY | ON | OFF | TAIL
+let stateStart       = 0;
+let trial            = 0;
+let onFrameCount     = 0;
+let offFrameCount    = 0;
+
+/* Canvas size captured at session start — the actual stimulation area. */
+let sessionCanvasWidth_px  = 0;
+let sessionCanvasHeight_px = 0;
+
+// Frame counts derived after FPS measurement (Math.round).
+let onDurationFrames  = 0;
+let offDurationFrames = 0;
+let jitterFrames      = 0;    // off-phase jitter: 0..jitterFrames extra frames per trial
+
+let firstOnsetTime_perf = null;
+let sessionStart_ms  = 0;
+let sessionStart_iso = '';
+let logData          = [];
+
+let measuredFPS      = 0;
+const MEASURE_FRAMES = 60;
+let   measureSamples = [];
+
+/* The order of the session and the per-trial state drawn from it. */
+let sequence         = null;   // [1|2|3, ...], one entry per trial
+let sequenceSeed     = 0;
+let jitterRng        = null;   // separate stream from the order, same seed
+let currentStim      = 0;      // stimulus shown in the current trial (1..3)
+let trialOffFrames   = 0;      // off-phase length of the current trial, frames
+let trialJitterFrames = 0;
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Parameters  (defaults; overwritten by readParams at session start)
+   ══════════════════════════════════════════════════════════════════════════ */
+let nCycles        = 200;
+let onDuration     = 200;    // ms — stimulus visible
+let offDuration    = 800;    // ms — background only
+let offJitter      = 0;      // ms — maximum random extension of the off phase
+let startDelay     = 3000;   // ms
+let firstStandards = 5;
+let minStandards   = 2;
+let maxStandardRun = 0;
+let stimCounts     = { 1: 160, 2: 40, 3: 0 };
+let shapeKinds     = { 1: 'X', 2: 'O', 3: '+' };
+let shapeHeight_deg = 2;
+let strokeWidth_deg = 0.25;
+
+let colStim1    = { r: 255, g: 255, b: 255 };
+let colStim2    = { r: 255, g: 255, b: 255 };
+let colStim3    = { r: 255, g: 255, b: 255 };
+const colStims  = [colStim1, colStim2, colStim3];
+let colBlank    = { r: 128, g: 128, b: 128 };  // background, during and between stimuli
+let colFixation = { r: 255, g:   0, b:   0 };
+let colSync1    = { r: 255, g: 255, b: 255 };  // sync dot, per stimulus
+let colSync2    = { r: 255, g:   0, b:   0 };
+let colSync3    = { r:   0, g: 255, b:   0 };
+const colSyncs  = [colSync1, colSync2, colSync3];
+let dotColourNow = colSync1;   // the colour the dot fires in for the current trial
+
+let screen_width_px  = 0;
+let screen_width_cm  = 53;
+let view_distance_cm = 57;
+let useFullscreen    = false;
+let enableLogging    = false;
+let userNote         = '';
+let pixelsPerDegree  = 36;
+
+let syncOnOnset  = true;
+let syncOnOffset = false;
+let syncDotFrames = 2;
+
+let fixationRadiusDeg   = 0.25;
+let fixationThicknessPx = 2;
+let showFixation  = true;
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Rendering data structures
+   ══════════════════════════════════════════════════════════════════════════ */
+let dotSize = 32;   // configurable via form / URL
+
+let imgData      = null;
+let imgBuf       = null;
+let bgBuf        = null;   // the background alone, copied in at every frame
+let ctx2d        = null;
+
+let dotPos         = { x: 32, y: 32 };
+let dotFlashFrames = 0;
+let dotPixels      = null;
+
+let crossPixels    = null;
+let crossGeom      = null;   // { cx, cy, arm, t0, t1 } — shared with the shader
+
+/* Per stimulus (index 1..3): the mask as drawn this session, its place on the
+   canvas, and the canvas byte offsets it covers. */
+let shapeMasks     = { 1: null, 2: null, 3: null };
+let shapePixels    = { 1: null, 2: null, 3: null };
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Parameter reading
+   ══════════════════════════════════════════════════════════════════════════ */
+function readParams() {
+  const f = id => document.getElementById(id);
+  nCycles          = Math.floor(+f('nCycles').value);
+  onDuration       = +f('onDuration').value;
+  offDuration      = +f('offDuration').value;
+  offJitter        = Math.max(0, +f('offJitter').value || 0);
+  startDelay       = +f('startDelay').value;
+  firstStandards   = Math.max(0, Math.floor(+f('firstStandards').value || 0));
+  minStandards     = Math.max(0, Math.floor(+f('minStandards').value || 0));
+  maxStandardRun   = Math.max(0, Math.floor(+f('maxStandardRun').value || 0));
+  const c = formCounts();
+  stimCounts       = { 1: c[1], 2: c[2], 3: c[3] };
+  shapeKinds       = { 1: f('shape1').value, 2: f('shape2').value, 3: f('shape3').value };
+  shapeHeight_deg  = +f('shapeHeight').value;
+  strokeWidth_deg  = +f('strokeWidth').value;
+  screen_width_px  = +f('screen_width_px').value;
+  screen_width_cm  = +f('screen_width_cm').value;
+  view_distance_cm = +f('view_distance_cm').value;
+  enableLogging    =  f('enableLogging').checked;
+  useFullscreen    =  f('useFullscreen').checked;
+  userNote         =  f('noteField').value || '';
+  syncDotFrames    = +f('syncDotFrames').value;
+  dotSize          = Math.max(1, +f('dotSize').value || 32);
+  syncOnOnset      =  f('syncOnOnset').checked;
+  syncOnOffset     =  f('syncOnOffset').checked;
+  showFixation         =  f('showFixation').checked;
+  fixationRadiusDeg    = +f('fixationRadius').value;
+  fixationThicknessPx  = Math.max(1, Math.round(+f('fixationThickness').value));
+  const dx = +f('dot_x').value, dy = +f('dot_y').value;
+  if (isFinite(dx)) dotPos.x = dx;
+  if (isFinite(dy)) dotPos.y = dy;
+
+  const cm_per_pixel  = screen_width_cm / screen_width_px;
+  const cm_per_degree = 2 * view_distance_cm * Math.tan(0.5 * Math.PI / 180);
+  pixelsPerDegree = cm_per_degree / cm_per_pixel;
+  if (!isFinite(pixelsPerDegree) || pixelsPerDegree <= 0) pixelsPerDegree = 36;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Precomputation
+   ══════════════════════════════════════════════════════════════════════════ */
+function prepareImageBuffer() {
+  ctx2d   = drawingContext;
+  imgData = ctx2d.createImageData(width, height);
+  imgBuf  = imgData.data;
+}
+
+/** The background alone, so every frame starts from one fast copy. */
+function prepareBackground() {
+  bgBuf = new Uint8ClampedArray(width * height * 4);
+  const r = colBlank.r, g = colBlank.g, b = colBlank.b;
+  for (let j = 0; j < bgBuf.length; j += 4) { bgBuf[j] = r; bgBuf[j+1] = g; bgBuf[j+2] = b; bgBuf[j+3] = 255; }
+}
+
+function prepareDotMask() {
+  const half = (dotSize / 2) | 0;
+  const x0 = Math.max(0, dotPos.x - half), y0 = Math.max(0, dotPos.y - half);
+  const x1 = Math.min(width - 1, dotPos.x + half - 1), y1 = Math.min(height - 1, dotPos.y + half - 1);
+  dotPixels = new Int32Array(Math.max(0, (x1 - x0 + 1) * (y1 - y0 + 1)));
+  let k = 0;
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++)
+      dotPixels[k++] = (y * width + x) * 4;
+}
+
+/** Fixation cross as pixel offsets, and as the integer geometry the shader
+    uses, so the two paths draw the same pixels. */
+function prepareCrossMask() {
+  const armPx = Math.round(fixationRadiusDeg * pixelsPerDegree);
+  const halfT = Math.floor(fixationThicknessPx / 2);
+  const cx = Math.round(width * 0.5), cy = Math.round(height * 0.5);
+  crossGeom = { cx: cx, cy: cy, arm: armPx, t0: -halfT, t1: fixationThicknessPx - halfT - 1 };
+  const offsets = [];
+  for (let d = -armPx; d <= armPx; d++) {
+    for (let t = -halfT; t < fixationThicknessPx - halfT; t++) {
+      const hx = cx + d, hy = cy + t;
+      if (hx >= 0 && hx < width && hy >= 0 && hy < height) offsets.push((hy * width + hx) * 4);
+      const vx = cx + t, vy = cy + d;
+      if (vx >= 0 && vx < width && vy >= 0 && vy < height) offsets.push((vy * width + vx) * 4);
+    }
+  }
+  crossPixels = new Int32Array([...new Set(offsets)]);
+}
+
+/**
+ * Draw every active stimulus's mask for this canvas and this viewing geometry,
+ * centred. Synchronous: the SVGs have to be decoded beforehand (see
+ * ensureSvgImages). Returns { ok, reason }.
+ */
+function buildShapes() {
+  const hpx = shapeHeight_deg * pixelsPerDegree, spx = strokeWidth_deg * pixelsPerDegree;
+  for (const i of [1, 2, 3]) {
+    shapeMasks[i] = null; shapePixels[i] = null;
+    if (!stimActive(i)) continue;
+    let m;
+    if (shapeKinds[i] === 'svg') {
+      const c = _svgCache[i];
+      if (!c.img) return { ok: false, reason: 'stimulus ' + i + ': ' + (c.err || 'SVG not loaded') };
+      m = VEP.svgShapeMask(c.img, c.w, c.h, hpx);
+    } else {
+      m = VEP.builtinShapeMask(shapeKinds[i], hpx, spx);
+    }
+    if (!m.ok) return { ok: false, reason: 'stimulus ' + i + ': ' + m.reason };
+    if (m.w > width || m.h > height)
+      return { ok: false, reason: 'stimulus ' + i + ' (' + m.w + ' × ' + m.h + ' px) is larger than the screen' };
+    m.x0 = Math.floor((width - m.w) / 2);
+    m.y0 = Math.floor((height - m.h) / 2);
+    const px = new Int32Array(m.area);
+    let k = 0;
+    for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++)
+      if (m.data[y * m.w + x]) px[k++] = ((m.y0 + y) * width + m.x0 + x) * 4;
+    shapeMasks[i] = m; shapePixels[i] = px;
+  }
+  return { ok: true };
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Rendering
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** One frame on the Canvas 2D path: background, the stimulus (0 = none),
+    fixation cross, sync dot. */
+function blitFrame(which) {
+  const buf = imgBuf;
+  buf.set(bgBuf);
+  const px = which > 0 ? shapePixels[which] : null;
+  if (px) {
+    const c = colStims[which - 1], r = c.r, g = c.g, b = c.b, n = px.length;
+    for (let k = 0; k < n; k++) { const j = px[k]; buf[j] = r; buf[j+1] = g; buf[j+2] = b; }
+  }
+  applyFixationAndDot();
+  ctx2d.putImageData(imgData, 0, 0);
+}
+
+/** Write fixation cross and sync dot into imgBuf. */
+function applyFixationAndDot() {
+  const buf = imgBuf;
+  if (showFixation && crossPixels) {
+    const crPx = crossPixels, nCr = crPx.length;
+    const fR = colFixation.r, fG = colFixation.g, fB = colFixation.b;
+    for (let k = 0; k < nCr; k++) {
+      const j = crPx[k]; buf[j] = fR; buf[j+1] = fG; buf[j+2] = fB;
+    }
+  }
+  const dotPx = dotPixels, nDot = dotPx.length;
+  /* Black between triggers; the current stimulus's colour while a sync event lasts. */
+  const dotOn = dotFlashFrames > 0;
+  const c = dotColourNow;
+  const dR = dotOn ? c.r : 0, dG = dotOn ? c.g : 0, dB = dotOn ? c.b : 0;
+  for (let k = 0; k < nDot; k++) {
+    const j = dotPx[k]; buf[j] = dR; buf[j+1] = dG; buf[j+2] = dB;
+  }
+  if (dotFlashFrames > 0) dotFlashFrames--;
+}
+
+/**
+ * renderFrame — per-frame paint dispatcher used by draw().
+ *   which = 0     background only (OFF / DELAY / MEASURE / TAIL)
+ *   which = 1..3  that stimulus
+ */
+function renderFrame(which) {
+  if (useWebGL && glRenderer.active) {
+    const dotOn = dotFlashFrames > 0;
+    if (dotFlashFrames > 0) dotFlashFrames--;     // mirror applyFixationAndDot()
+    glRenderer.render(which, dotOn, dotColourNow);
+  } else {
+    blitFrame(which);
+  }
+}
+
+/** Hand the session's masks, colours and geometry to the shader. */
+function _glUploadSession() {
+  const act = activeStimuli();
+  let aw = 1, ah = 0;
+  act.forEach(function (i) { const m = shapeMasks[i]; aw = Math.max(aw, m.w); ah += m.h; });
+  ah = Math.max(1, ah);
+  const atlas = new Uint8Array(aw * ah);
+  const shapes = [];
+  let y = 0;
+  [1, 2, 3].forEach(function (i) {
+    const m = shapeMasks[i];
+    if (!m) { shapes.push(null); return; }
+    for (let r = 0; r < m.h; r++) for (let x = 0; x < m.w; x++) atlas[(y + r) * aw + x] = m.data[r * m.w + x];
+    shapes.push({ x0: m.x0, y0: m.y0, w: m.w, h: m.h, atlasY: y, colour: colStims[i - 1] });
+    y += m.h;
+  });
+  glRenderer.uploadAtlas(atlas, aw, ah);
+  glRenderer.setSession({
+    W: width, H: height, background: colBlank,
+    fixation: { show: showFixation, cx: crossGeom.cx, cy: crossGeom.cy, arm: crossGeom.arm,
+                t0: crossGeom.t0, t1: crossGeom.t1, colour: colFixation },
+    dot: { x: dotPos.x, y: dotPos.y, size: dotSize },
+    shapes: shapes,
+  });
+}
+
+/* ── WebGL parity self-check + session enable ─────────────────────────────
+   Renders the background and every active stimulus both ways (WebGL vs the
+   Canvas2D reference) and compares them pixel by pixel, so the GPU path is
+   used only when it matches; otherwise the session falls back to Canvas2D. */
+function _glParityCheck(tol) {
+  tol = (tol == null) ? 2 : tol;
+  if (!glRenderer.active) return { passed: false, reason: 'WebGL inactive' };
+  const W = width, H = height;
+  const gl = document.getElementById('glCanvas').getContext('webgl2');
+  const px = new Uint8Array(W * H * 4);
+  const savedDot = dotFlashFrames;
+  let maxDiff = 0, over = 0, n = 0;
+  [0].concat(activeStimuli()).forEach(function (which) {
+    dotFlashFrames = 0;
+    blitFrame(which);                                 // Canvas2D reference, dot off
+    const ref = Uint8ClampedArray.from(imgBuf);
+    glRenderer.render(which, false, dotColourNow);
+    gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    for (let y = 0; y < H; y++) {
+      const glRow = (H - 1 - y) * W * 4, c2Row = y * W * 4;
+      for (let x = 0; x < W; x++) {
+        const gi = glRow + x * 4, ci = c2Row + x * 4;
+        const d = Math.max(Math.abs(px[gi]-ref[ci]), Math.abs(px[gi+1]-ref[ci+1]), Math.abs(px[gi+2]-ref[ci+2]));
+        if (d > maxDiff) maxDiff = d;
+        if (d > tol) over++;
+        n++;
+      }
+    }
+  });
+  dotFlashFrames = savedDot;
+  const pctOver = 100 * over / n;
+  /* Masks and cross are integer geometry on both paths, so anything but an
+     exact match means the shader is not drawing what the reference draws. */
+  const report = { passed: over === 0, maxDiff, pctOver: +pctOver.toFixed(4), tolerance: tol,
+                   pixels: n, pattern: 'oddball' };
+  window.__glParity = report;
+  return report;
+}
+function _glEnableForSession() {
+  useWebGL = false;
+  const glCv = document.getElementById('glCanvas');
+  const p5Cv = document.querySelector('canvas:not(#glCanvas):not(#pickerWheel)');
+  // Re-parent the GL canvas to <body> so it lays out full-viewport while the
+  // settings overlay is hidden.
+  if (glCv && glCv.parentElement !== document.body) document.body.appendChild(glCv);
+  // WebGL is the default render path (parity-gated). Force Canvas2D with ?webgl=0.
+  if (glCv) glCv.style.display = 'none';
+  if (p5Cv) p5Cv.style.opacity = '';
+  if (urlParams.get('webgl') === '0') return;
+  try {
+    glCv.width = width; glCv.height = height;
+    if (!glRenderer.active) glRenderer.init(glCv);
+    glRenderer.resize(width, height);
+    _glUploadSession();
+    const par = _glParityCheck();
+    if (!par.passed) {
+      console.warn('WebGL parity failed (maxDiff=' + par.maxDiff + ', ' + par.pctOver +
+                   '% over tol) — using Canvas2D.', par);
+      throw new Error('parity');
+    }
+    useWebGL = true;
+    if (glCv) glCv.style.display = 'block';
+    if (p5Cv) p5Cv.style.opacity = '0';
+  } catch (e) {
+    useWebGL = false;
+    if (glCv) glCv.style.display = 'none';
+    if (p5Cv) p5Cv.style.opacity = '';
+  }
+}
+
+function _showParityReport(rep) {
+  console.log('[VEP parity]', rep);
+  let el = document.getElementById('parityReport');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'parityReport';
+    el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2147483600;'
+      + 'padding:.8em 1.2em;font:13px/1.5 monospace;color:#fff;white-space:pre-wrap;';
+    document.body.appendChild(el);
+  }
+  el.style.background = rep.passed ? 'rgba(20,110,60,.96)' : 'rgba(150,40,40,.96)';
+  el.textContent = 'WebGL parity — ' + (rep.passed ? 'PASS' : 'FAIL') + '\n'
+    + JSON.stringify(rep, null, 2);
+}
+function _runParitySelfTest() {
+  ensureSvgImages().catch(function () {}).then(function () {
+    let rep;
+    try {
+      readParams();
+      loadGammaCalibration();
+      resizeCanvas(windowWidth, windowHeight);
+      sessionCanvasWidth_px = width; sessionCanvasHeight_px = height;
+      prepareImageBuffer(); prepareBackground(); prepareDotMask(); prepareCrossMask();
+      const sh = buildShapes();
+      if (!sh.ok) throw new Error(sh.reason);
+      const glCv = document.getElementById('glCanvas');
+      glCv.width = width; glCv.height = height;
+      if (!glRenderer.active) glRenderer.init(glCv);
+      glRenderer.resize(width, height);
+      _glUploadSession();
+      rep = _glParityCheck();
+    } catch (e) {
+      rep = { passed: false, reason: e.message };
+    }
+    rep.stimulus = 'oddball';
+    _showParityReport(rep);
+    try {
+      const tgt = window.opener || (window.parent !== window ? window.parent : null);
+      if (tgt) tgt.postMessage({ type: 'vep_parity', report: rep }, '*');
+    } catch (e) {}
+  });
+}
+window._glParityCheck     = _glParityCheck;
+window._runParitySelfTest = _runParitySelfTest;
+window._glDebug = function () {
+  const info = { useWebGL: useWebGL,
+                 active: (typeof glRenderer!=='undefined' && glRenderer.active),
+                 devicePixelRatio: window.devicePixelRatio,
+                 inner: [window.innerWidth, window.innerHeight],
+                 bodyBg: getComputedStyle(document.body).backgroundColor };
+  const c = document.getElementById('glCanvas');
+  if (c) {
+    let center = null;
+    try { const g = c.getContext('webgl2'); const px = new Uint8Array(4);
+          g.readPixels(c.width >> 1, c.height >> 1, 1, 1, g.RGBA, g.UNSIGNED_BYTE, px);
+          center = [px[0], px[1], px[2], px[3]]; }
+    catch (e) { center = 'err:' + e.message; }
+    info.glCanvasCenterPixel = center;
+  }
+  info.canvases = [].map.call(document.querySelectorAll('canvas'), function (el) {
+    const r = el.getBoundingClientRect(); const cs = getComputedStyle(el);
+    return { id: el.id || null, cls: (el.className || null),
+             buffer: [el.width, el.height],
+             rect: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)],
+             display: cs.display, zIndex: cs.zIndex, opacity: cs.opacity, position: cs.position };
+  });
+  console.log(JSON.stringify(info, null, 2));
+  return info;
+};
+
+
+
+function setup() {
+  pixelDensity(1);
+  createCanvas(windowWidth, windowHeight);
+  noLoop();
+
+  /* Detect and report the renderer (Canvas 2D vs WebGL 2). */
+  _checkWebGLBackground().catch(function(e) {
+    const n = document.getElementById('rendererNote');
+    if (n) n.textContent = 'Renderer: Canvas 2D (WebGL check error)';
+  });
+
+  /* Show calibration status and the display refresh rate immediately on load,
+     rather than only after the first session. */
+  loadGammaCalibration();
+  if (!_isChild) {
+    updateCalibrationStatusEl('calibrationStatus');
+    _probeDisplayRefreshRate();
+    const _calInput = document.getElementById('calLoadInput');
+    if (_calInput) {
+      _calInput.addEventListener('change', function (ev) {
+        if (ev.target.files && ev.target.files[0]) loadCalibrationFromFile(ev.target.files[0]);
+      });
+    }
+    /* Built at click time so it reflects the form as it stands. */
+    const _gateLink = document.getElementById('gateBackLink');
+    if (_gateLink) _gateLink.addEventListener('click', function () {
+      try { this.href = buildGateBackURL(); } catch (e) {}
+    });
+    const _refreshEl = document.getElementById('displayRefreshHz');
+    if (_refreshEl) _refreshEl.addEventListener('input', updateRefreshMismatchNote);
+    const _applyBtn = document.getElementById('applyContrastBtn');
+    if (_applyBtn) _applyBtn.addEventListener('click', applyContrastToColours);
+    onStimulusFormChange();     // the calibration is loaded now: refresh contrast readouts
+  }
+  /* Autostart replaces the panel with its confirmation screen. Done last, so
+     everything it reports — parameters, calibration, contrast — is already in
+     place. */
+  if (_isAutostart) _showAutostartScreen();
+
+  /* Keyboard controls (main window and stimulus window):
+       Space — pause / resume        Esc — stop / abort
+     Forwarded to the separate stimulus window when one is open. */
+  window.addEventListener('keydown', (e) => {
+    /* Don't hijack keys while the operator is typing in a settings field. */
+    const t = e.target;
+    const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' ||
+                         t.tagName === 'SELECT' || t.isContentEditable);
+
+    /* Pause / resume: Space (ignored while typing). */
+    if ((e.key === ' ' || e.code === 'Space') && !e.ctrlKey && !typing) {
+      e.preventDefault();
+      if (_childWin && !_childWin.closed) {
+        _toChild({ type: 'vep_pause_toggle' });
+      } else {
+        if (state === 'PAUSED')                           resumeSession();
+        else if (state !== 'INIT' && state !== 'MEASURE') pauseSession();
+      }
+    }
+
+    /* Stop: Escape or Ctrl+Space. Ctrl+Space is preferred in a fullscreen
+       stimulus window because — unlike Escape — the browser neither reserves it
+       to leave fullscreen nor uses it for text editing. */
+    /* Stop key: Ctrl+Space, and only that.
+       Escape used to stop as well, which sounds friendlier than it was. The
+       browser reserves Escape for leaving full-screen and does not deliver it
+       to the page at all while full-screen, so it stopped the run in some
+       situations and merely left full-screen in others — the operator could not
+       form a reliable habit. Escape still ends a full-screen run, but through
+       one route only: leaving full-screen mid-run is treated as an abort, which
+       is a single press with a single outcome. */
+    const ctrlSpace = (e.ctrlKey && (e.key === ' ' || e.code === 'Space'));
+    if (ctrlSpace) {
+      e.preventDefault();
+      if (_isChild) {
+        if (state === 'PAUSED') state = pausedState;
+        if (state !== 'INIT') abortStimulation(true);
+        return;
+      }
+      if (_childWin && !_childWin.closed) _toChild({ type: 'vep_stop' });
+      if (state === 'PAUSED') state = pausedState;
+      /* Guarded, as _runStop is: without this every further press after a run
+         has ended re-runs the abort and downloads the log again. */
+      if (state !== 'INIT') abortStimulation(true);
+      return;
+    }
+
+    /* Escape while presenting in a window rather than full-screen: nothing
+       happens, and reaching for it is the natural reflex. Say what to press
+       instead rather than leaving the operator to wonder. */
+    if ((e.key === 'Escape' || e.key === 'Esc') && !typing
+        && state !== 'INIT' && !document.fullscreenElement) {
+      _runControls.set(_runControls.state() || 'running',
+                       'Escape does nothing here \u2014 press Ctrl+Space to stop.');
+    }
+  });
+
+  if (urlParams.has('parity')) setTimeout(_runParitySelfTest, 500);
+}
+
+/**
+ * A session that cannot start (an SVG that would not decode, a sequence that
+ * cannot be built) ends here, before anything is presented, with the reason.
+ */
+function _sessionRefused(reason) {
+  noLoop(); state = 'INIT'; cursor();
+  const msg = 'Cannot start — ' + reason;
+  if (_isChild) {
+    VEP.showChildFinished(msg);
+    _toParent({ type: 'vep_refused', reason: reason });
+    return;
+  }
+  if (_isAutostart) { VEP.showChildFinished(msg); return; }
+  _restoreMainWindow(msg);
+}
+
+function startStimulation() {
+  /* Decoding an SVG is the one asynchronous step; everything after it is
+     synchronous. Wait for it here, so every way into a session — Start, the
+     autostart button, a parent's command to this stimulus window — gets it. */
+  if (!svgImagesReady()) {
+    ensureSvgImages().then(startStimulation, function (e) { _sessionRefused(e.message); });
+    return;
+  }
+  /* Child mode: the "awaiting start signal" note must not linger over the
+     stimulus once a session is running. */
+  VEP.showChildWaiting(false);
+  readParams();
+  const problems = startProblems();
+  if (problems.length) { _sessionRefused(problems.join(' ')); return; }
+  sequenceSeed = sessionSeed();
+  const seq = formSequence(sequenceSeed);
+  if (!seq.ok) { _sessionRefused('sequence: ' + seq.reason); return; }
+  sequence  = seq.order;
+  /* Jitter comes from its own stream of the same seed, so changing the jitter
+     never changes the order. */
+  jitterRng = VEP.makeRng((sequenceSeed ^ 0x9E3779B9) >>> 0);
+  try { refreshSequenceReadout(); } catch (e) {}
+
+  if (_isChild) _toParent({ type: 'vep_measuring' });
+  sessionStart_ms  = Date.now();
+  sessionStart_iso = new Date(sessionStart_ms).toISOString();
+
+  /* Capture screen/display info at session start (async; resolves before
+     MEASURE ends so data is ready when downloadLog() is called).       */
+  _screenInfo = null;
+  getScreenInfo().catch(function() {});
+  trial = 0; logData = []; firstOnsetTime_perf = null; dotFlashFrames = 0;
+  currentStim = 0; dotColourNow = colSync1;
+  measuredFPS = 0; measureSamples = [];
+
+  loadGammaCalibration();
+  updateCalibrationStatusEl('calibrationStatus');
+  /* window.innerWidth rather than p5's windowWidth: p5 refreshes its globals
+     from its own resize listener, which may not have run yet after a full-screen
+     transition. Reading the window directly cannot be a step behind. */
+  resizeCanvas(window.innerWidth, window.innerHeight);
+  sessionCanvasWidth_px  = width;
+  sessionCanvasHeight_px = height;
+  _reportGeometryToParent();   // canvas now sized for this session
+  prepareImageBuffer();
+  prepareBackground();
+  prepareDotMask();
+  prepareCrossMask();
+  const sh = buildShapes();
+  if (!sh.ok) { _sessionRefused(sh.reason); return; }
+
+  _glEnableForSession();
+  /* Sync note + APA to the real renderer (parity gate may have fallen back). */
+  _syncRendererReadout();
+
+  frameRate(999);
+  noCursor();
+  state = 'MEASURE';
+  _bgSafety.markFrame();
+  _bgSafety.start();
+  loop();
+}
+
+function beginTrial() {
+  trial++;
+  if (trial > nCycles) {
+    /* Don't end on the last trial's offset: hold a background-only tail of
+       startDelay ms first, mirroring the pre-run delay, so the recording has a
+       clean baseline after the final response. */
+    if (startDelay > 0) {
+      state = 'TAIL'; stateStart = millis();
+      if (_isChild) _toParent({ type: 'vep_tail' });
+      else if (_runControls) _runControls.status('Post-stimulus baseline…');
+    } else {
+      endSession();
+    }
+    return;
+  }
+  if (trial === 1) _announceRunning();
+  _reportProgress(trial, nCycles);
+  currentStim       = sequence[trial - 1];
+  dotColourNow      = colSyncs[currentStim - 1];
+  trialJitterFrames = jitterFrames > 0 ? Math.floor(jitterRng() * (jitterFrames + 1)) : 0;
+  trialOffFrames    = offDurationFrames + trialJitterFrames;
+  state          = 'ON';
+  stateStart     = millis();
+  onFrameCount   = 0;
+  if (syncOnOnset) dotFlashFrames = syncDotFrames;
+  // Pre-push the log record. Timestamps are captured inside the draw branches:
+  // onset after the first ON-frame blit, offset after the first OFF-frame blit.
+  if (enableLogging) {
+    const framePeriod_ms = measuredFPS > 0 ? 1000 / measuredFPS : null;
+    logData.push({
+      trial,
+      stimulus              : currentStim,
+      role                  : ROLE[currentStim],
+      sync_colour           : rgbToHex(dotColourNow),
+      on_duration_target_ms : onDuration,
+      off_jitter_frames     : trialJitterFrames,
+      off_duration_target_frames: trialOffFrames,
+      off_duration_target_ms: framePeriod_ms != null ? +(trialOffFrames * framePeriod_ms).toFixed(3) : null,
+      onset_ms              : null,  // filled after first ON-frame blit
+      onset_perf_ms         : null,
+      offset_ms             : null,  // filled after first OFF-frame blit
+      offset_perf_ms        : null,
+      on_duration_real_ms   : null,  // real:    onsetPerf → offsetPerf
+      on_duration_frames    : null,  // count of rendered ON frames
+      on_duration_frames_ms : null,  // derived: frames × 1000/measuredFPS
+    });
+  }
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  sessionCanvasWidth_px  = width;
+  sessionCanvasHeight_px = height;
+  _reportGeometryToParent();   // canvas now sized for this session
+  if (state === 'INIT') return;
+  prepareImageBuffer();
+  prepareBackground();
+  prepareDotMask();
+  prepareCrossMask();
+  const sh = buildShapes();
+  if (!sh.ok) { abortStimulation(true); return; }
+  if (useWebGL && glRenderer.active) {
+    glRenderer.resize(width, height);
+    _glUploadSession();
+  }
+}
+
+function draw() {
+  _bgSafety.markFrame();
+  if (state === 'INIT' || state === 'PAUSED') return;
+  const now = millis();
+
+  if (state === 'MEASURE') {
+    renderFrame(0);
+    if (frameCount > 1 && deltaTime > 0) measureSamples.push(deltaTime);
+    if (measureSamples.length >= MEASURE_FRAMES) {
+      const sorted = [...measureSamples].sort((a, b) => a - b);
+      measuredFPS = Math.round(1000 / sorted[Math.floor(sorted.length / 2)] * 10) / 10;
+      document.getElementById('fpsDisplay').textContent = measuredFPS.toFixed(1) + ' Hz';
+      try { updateRefreshMismatchNote(); } catch (e) {}
+      if (_isChild) _toParent({ type: 'vep_fps', fps: measuredFPS });
+
+      // Target frame counts (Math.round → nearest frame to target).
+      onDurationFrames  = Math.max(1, Math.round(onDuration  * measuredFPS / 1000));
+      offDurationFrames = Math.max(1, Math.round(offDuration * measuredFPS / 1000));
+      jitterFrames      = Math.max(0, Math.round(offJitter   * measuredFPS / 1000));
+
+      if (startDelay > 0) { state = 'DELAY'; stateStart = millis(); }
+      else                { beginTrial(); }
+    }
+    return;
+  }
+
+  if (state === 'DELAY') {
+    renderFrame(0);
+    if (now - stateStart >= startDelay) beginTrial();
+    return;
+  }
+
+  if (state === 'ON') {
+    renderFrame(currentStim);
+    onFrameCount++;
+
+    // Onset: after blitting the first ON frame — the first changed frame.
+    if (onFrameCount === 1 && enableLogging && logData.length) {
+      const now_perf = performance.now();
+      if (firstOnsetTime_perf === null) firstOnsetTime_perf = now_perf;
+      const rec = logData[logData.length - 1];
+      rec.onset_perf_ms = +now_perf.toFixed(3);
+      rec.onset_ms      = +(now_perf - firstOnsetTime_perf).toFixed(3);
+    }
+
+    // Frame-count termination.
+    if (onFrameCount >= onDurationFrames) {
+      if (syncOnOffset) dotFlashFrames = syncDotFrames;   // same colour as the onset trigger
+      offFrameCount = 0;
+      state = 'OFF'; stateStart = now;
+    }
+    return;
+  }
+
+  if (state === 'OFF') {
+    renderFrame(0);
+    offFrameCount++;
+
+    // Offset: after blitting the first OFF frame.
+    if (enableLogging && logData.length) {
+      const rec = logData[logData.length - 1];
+      if (rec.offset_perf_ms === null && rec.onset_perf_ms !== null) {
+        const off_perf       = performance.now();
+        const framePeriod_ms = measuredFPS > 0 ? 1000 / measuredFPS : null;
+        rec.offset_perf_ms        = +off_perf.toFixed(3);
+        rec.offset_ms             = +(off_perf - firstOnsetTime_perf).toFixed(3);
+        rec.on_duration_real_ms   = +(off_perf - rec.onset_perf_ms).toFixed(3);
+        rec.on_duration_frames    = onFrameCount;
+        rec.on_duration_frames_ms = framePeriod_ms != null
+          ? +(onFrameCount * framePeriod_ms).toFixed(3)
+          : null;
+      }
+    }
+
+    // Frame-count termination for the off phase, jitter included.
+    if (offFrameCount >= trialOffFrames) beginTrial();
+    return;
+  }
+
+  /* ── TAIL: background for startDelay ms after the last trial ── */
+  if (state === 'TAIL') {
+    renderFrame(0);
+    if (millis() - stateStart >= startDelay) endSession();
+    return;
+  }
+}
+
+
+
+
+
+
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Session control
+   ══════════════════════════════════════════════════════════════════════════ */
+function endSession() {
+  _bgSafety.stop();
+  _sessionCompleted = true;
+  useWebGL = false;
+  const _glCvE=document.getElementById('glCanvas');
+  const _p5cE=document.querySelector('canvas:not(#glCanvas):not(#pickerWheel)');
+  if(_glCvE) _glCvE.style.display='none';
+  if(_p5cE) _p5cE.style.opacity='';
+  VEP.showPauseNote(false);
+  noLoop(); state = 'INIT'; cursor();
+  if (_isChild) {
+    /* Child window: terminal FINISHED note; report completion to the parent
+       even when logging is off, so the parent re-enables Start. */
+    _rendererDecided = false;
+    VEP.showChildFinished('FINISHED');
+    if (enableLogging && logData.length) downloadLog();   // sends vep_done with the log
+    else _toParent({ type: 'vep_done', log: null });
+    return;
+  }
+  if (_isAutostart) {
+    /* An autostart run has no settings panel to return to — it is hidden — so
+       it ends the way a stopped one does: report what was saved, then close. */
+    let savedAs = null;
+    if (enableLogging && logData.length) savedAs = downloadLog();
+    _autostartFinish(savedAs);
+    return;
+  }
+  document.getElementById('overlay').style.display = 'flex';
+  if (enableLogging && logData.length) downloadLog();
+  _restoreMainWindow('Session complete \u2014 log saved.');
+}
+
+/* Return the settings (main) window to its pre-stimulation state. */
+function _restoreMainWindow(statusText) {
+  _rendererDecided = false; _childUseWebGL = null;
+  cursor();
+  const efb = document.getElementById('exitFsBtn');
+  if (efb) efb.style.display = 'none';
+  if (document.fullscreenElement && document.exitFullscreen) {
+    document.exitFullscreen().catch(() => {});
+  }
+  document.getElementById('overlay').style.display = 'flex';
+  if (_runControls) { _runControls.set('idle', statusText || 'Ready.'); _refreshRunControls(); }
+}
+
+function abortStimulation(download = false) {
+  noLoop(); state = 'INIT'; cursor(); _bgSafety.stop();
+  const _glCv=document.getElementById('glCanvas');
+  const _p5c=document.querySelector('canvas:not(#glCanvas):not(#pickerWheel)');
+  if(_glCv) _glCv.style.display='none';
+  if(_p5c) _p5c.style.opacity='';
+  useWebGL=false;
+  VEP.showPauseNote(false);
+  if(_isChild){
+    /* Stopped in the child: terminal note, not the "awaiting start" note. */
+    _rendererDecided = false;
+    VEP.showChildFinished('FINISHED');
+    _sessionCompleted=false;
+    if(typeof enableLogging!=='undefined'&&enableLogging&&
+       typeof logData!=='undefined'&&logData.length) downloadLog();
+    else _toParent({type:'vep_aborted',log:null});
+    return;
+  }
+  _sessionCompleted=false;
+  let _savedAs = null;
+  if(download&&typeof enableLogging!=='undefined'&&enableLogging&&
+     typeof logData!=='undefined'&&logData.length) _savedAs = downloadLog();
+  /* An autostart run that was stopped still has nowhere to return to — the
+     settings panel is hidden — so it closes down the same way a completed one
+     does, reporting what was saved. */
+  if (_isAutostart) { _autostartFinish(_savedAs); return; }
+  _restoreMainWindow('Stopped.');
+}
+
+/* One number for the whole suite: the files are only ever used together, so a
+   per-file version would say nothing useful. Bump it for any release. */
+const SUITE_VERSION = '1.2.0';
+
+/**
+ * Name a log after the session it records, so several runs in one folder tell
+ * themselves apart without being opened.
+ *
+ * The timestamp is the session's start, taken from the log itself rather than
+ * from the moment of saving: those differ by the length of the run, and a name
+ * that disagrees with session_start_iso inside the file is worse than no
+ * timestamp at all. Colons are not allowed in Windows filenames, hence the
+ * dashes. The session note follows when there is one, reduced to characters
+ * that survive every filesystem.
+ */
+function logFileName(logObj) {
+  const base = 'vep_oddball';
+  let stamp = '';
+  const iso = logObj && logObj.session_start_iso;
+  if (iso) stamp = String(iso).replace(/\.\d+Z$/, '').replace(/:/g, '-');
+  let note = (logObj && logObj.note) ? String(logObj.note) : '';
+  note = note.trim()
+    .replace(/[^A-Za-z0-9._-]+/g, '-')   // anything else, including accents, becomes a dash
+    .replace(/[-._]{2,}/g, '-')          // no runs of separators left behind by the above
+    .replace(/^[-._]+|[-._]+$/g, '')
+    .slice(0, 40).replace(/[-._]+$/, '');
+  return [base, stamp, note].filter(Boolean).join('_') + '.json';
+}
+
+function downloadLog() {
+  const L = stimulusLuminances();
+  const meas = luminanceIsMeasured();
+  const stimuli = activeStimuli().map(function (i) {
+    const m = shapeMasks[i];
+    const isSvg = shapeKinds[i] === 'svg';
+    const prep = isSvg ? VEP.prepareSVG(svgTextOf(i)) : null;
+    return {
+      stimulus       : i,
+      role           : ROLE[i],
+      count          : stimCounts[i],
+      shape          : shapeKinds[i],
+      svg_name       : isSvg ? (svgNameOf(i) || null) : null,
+      svg_sha256     : (prep && prep.ok) ? VEP.sha256Hex(prep.svg) : null,
+      /* The file itself, as cleaned and drawn, so the log alone shows the shape. */
+      svg            : (prep && prep.ok) ? prep.svg : null,
+      colour         : rgbToHex(colStims[i - 1]),
+      sync_colour    : rgbToHex(colSyncs[i - 1]),
+      width_px       : m ? m.w : null,
+      height_px      : m ? m.h : null,
+      width_deg      : m ? +(m.w / pixelsPerDegree).toFixed(3) : null,
+      height_deg     : m ? +(m.h / pixelsPerDegree).toFixed(3) : null,
+      drawn_area_px  : m ? m.area : null,
+      contrast_vs_background: (L && L.stim[i] && L.stim[i].contrast != null) ? +L.stim[i].contrast.toFixed(4) : null,
+      L_cdm2         : (meas && L) ? +L.stim[i].L.toFixed(3) : null,
+    };
+  });
+  const output = {
+    params: {
+      nCycles, onDuration, offDuration, offJitter, startDelay,
+      onDurationFrames, offDurationFrames, jitterFrames,
+      measuredFPS,   // frames actually delivered, not the panel's refresh rate
+      display_refresh_hz: declaredRefreshHz() || null,
+      shapeHeight_deg, strokeWidth_deg,
+      colBlank: rgbToHex(colBlank), colFixation: rgbToHex(colFixation),
+      enableLogging,
+      renderer : _sessionRenderer,
+      webgl_parity : (typeof window!=='undefined' && window.__glParity) ? window.__glParity : null,
+      pause_count: logData.filter(function(e){return e.event==='pause';}).length,
+      webgl_test : webglTestResult ? {passed:webglTestResult.passed, timing_60f_ms:webglTestResult.timing_60f_ms} : null,
+      screen_info: _screenInfo || null,
+    },
+    stimuli: stimuli,
+    sequence: {
+      seed           : sequenceSeed,
+      generator      : 'mulberry32',
+      total          : nCycles,
+      counts         : { 1: stimCounts[1], 2: stimCounts[2], 3: stimCounts[3] },
+      first_standards: firstStandards,
+      min_standards_before_nonstandard: minStandards,
+      max_standard_run: maxStandardRun,
+      /* One digit per trial, in presentation order — the order as planned.
+         The trials below record what was actually presented, up to a stop. */
+      order          : sequence ? sequence.join('') : null,
+    },
+    calibration: {
+      screen_width_px, screen_width_cm, view_distance_cm,
+      pixelsPerDegree    : +pixelsPerDegree.toFixed(2),
+      canvas_width_px    : sessionCanvasWidth_px,
+      canvas_height_px   : sessionCanvasHeight_px,
+      canvas_width_deg   : +(sessionCanvasWidth_px  / pixelsPerDegree).toFixed(2),
+      canvas_height_deg  : +(sessionCanvasHeight_px / pixelsPerDegree).toFixed(2),
+      fullscreen         : useFullscreen,
+    },
+    gamma: gammaCalibration ? {
+      model              : gammaCalibration.model,
+      L_max_cdm2         : gammaCalibration.L_max_cdm2,
+      L_min_cdm2         : gammaCalibration.L_min_cdm2,
+      calibration_date   : gammaCalibration.calibration_date,
+      cal_source         : gammaCalSource === 'file' ? (gammaCalFileName || 'file') : gammaCalSource,
+      dc_correction_cdm2 : 0,
+      /* Contrast of each stimulus against the background is in stimuli[];
+         this is the deviant's, for readers that expect a single figure. */
+      michelson_contrast : (L && L.stim[2] && L.stim[2].contrast != null) ? +L.stim[2].contrast.toFixed(4) : null,
+      luminance_basis    : luminanceBasis(),
+      L_background_cdm2  : (meas && L) ? +L.L_background.toFixed(3) : null,
+    } : { model: 'srgb_assumed', cal_source: 'none', dc_correction_cdm2: 0,
+          michelson_contrast : (L && L.stim[2] && L.stim[2].contrast != null) ? +L.stim[2].contrast.toFixed(4) : null,
+          luminance_basis: 'not_reported', L_background_cdm2: null },
+    sync: { dot_x: dotPos.x, dot_y: dotPos.y, dot_size: dotSize,
+            colour: rgbToHex(colSync1),
+            colours: { 1: rgbToHex(colSync1), 2: rgbToHex(colSync2),
+                       3: stimActive(3) ? rgbToHex(colSync3) : null },
+            syncDotFrames, syncOnOnset, syncOnOffset },
+    fixation: {
+      showFixation,
+      radius_deg   : fixationRadiusDeg,
+      thickness_px : fixationThicknessPx,
+      colour       : rgbToHex(colFixation),
+    },
+    note             : userNote,
+    session_start_ms : sessionStart_ms,
+    session_start_iso: sessionStart_iso,
+    stimulus         : 'oddball',
+    /* The link that reproduces this session: every parameter, the SVGs, the
+       seed and the calibration object entire. */
+    replication_url  : (function () {
+      try { return updateURLPreview(); } catch (e) { return window.location.href; }
+    })(),
+    suite_version    : SUITE_VERSION,
+    engine_version   : VEP.version,
+    trials           : logData,
+  };
+  if (_isChild) {
+    /* Child window: transmit the complete log object to the parent, which saves it. */
+    _toParent({
+      type: _sessionCompleted ? 'vep_done' : 'vep_aborted',
+      log : output,
+    });
+    return;
+  }
+
+  const blob = new Blob([JSON.stringify(output, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const name = logFileName(output);
+  a.href = url; a.download = name; a.click();
+  URL.revokeObjectURL(url);
+  return name;
+}
+
+
+/* ── Parent / child window communication ─────────────── */
+
+
+// ─── Background-safety guard ──────────────────────────────────────────────
+const _bgSafety = VEP.createWatchdog({
+  graceMs: 3500,   // cover the fullscreen transition + MEASURE warm-up (incl. Firefox hitches)
+  getState: function () { return (typeof state !== 'undefined') ? state : undefined; },
+  onAbort: function (reason) {
+    if (typeof state === 'undefined' || state === 'INIT' || state === 'PAUSED') return;
+    noLoop(); state = 'INIT'; cursor();
+    document.getElementById('overlay').style.display = 'flex';
+    const e = document.getElementById('bgWarn');
+    if (e) { e.textContent = reason; e.style.display = 'block'; }
+    if (typeof enableLogging !== 'undefined' && enableLogging &&
+        typeof logData !== 'undefined' && logData.length) downloadLog();
+  },
+  onClear: function () {
+    const e = document.getElementById('bgWarn');
+    if (e) e.style.display = 'none';
+  }
+})
+
+/* ── Parent / child window communication ───────────────────────────────── */
+const _isChild = window.opener !== null && /^vep_present_/.test(window.name);
+let _childWin        = null;
+let _childReady      = false;
+/* Canvas geometry reported by the child stimulus window ('vep_geometry').
+   The APA methods text must describe the surface the stimulus is actually
+   presented on, which is the child window whenever one is open.          */
+let _childCanvasW    = 0;
+let _childCanvasH    = 0;
+let _childFullscreen = false;
+/* The parent that most recently addressed this child. Falls back to the
+   original opener, so a shared stimulus window can be driven by whichever
+   settings page reused it even if window.opener still points elsewhere.   */
+let _activeParent    = (window.opener && !window.opener.closed) ? window.opener : null;
+
+/* Parent<->child link (shared window + handshake) — see vep_engine.js. State
+   stays here; the engine reaches it through these accessors. */
+const _childLink = VEP.childLink({
+  isChild: _isChild,
+  windowName: 'vep_present_oddball',   // one presentation window per stimulus
+  getChildWin:     () => _childWin,   setChildWin:   (w) => { _childWin = w; },
+  getChildReady:   () => _childReady, setChildReady: (b) => { _childReady = b; },
+  getActiveParent: () => _activeParent,
+  buildURL: () => {
+    try { updateURLPreview(); } catch (e) { console.warn('URL build:', e); }
+    const el = document.getElementById('urlPreview');
+    return (el ? el.textContent.trim() : '') || window.location.href;
+  },
+  updateChildUI: _updateChildUI,
+  /* Child gone: drop its cached canvas geometry so the APA methods text
+     goes back to describing this window. */
+  onChildClosed: () => {
+    _childCanvasW = 0; _childCanvasH = 0; _childFullscreen = false;
+    _childFPS = { hz: 0, exact: false };   // its rate described that window, not this one
+    refreshFpsDisplay();
+    try { updateRefreshMismatchNote(); } catch (e) {}
+    try { buildAPADescription(); } catch (e) {}
+  }
+});
+const _toChild             = _childLink.toChild;
+const _toParent            = _childLink.toParent;
+const openStandaloneWindow = _childLink.openStandaloneWindow;
+let _sessionCompleted = false;
+let useWebGL         = false;
+let webglTestResult  = null;
+let _sessionRenderer = 'canvas2d';   /* renderer actually used this session (log) */
+let _rendererDecided = false;   /* true once a session's renderer is chosen */
+let _childUseWebGL   = null;    /* the child window's actual renderer, if known */
+let _screenInfo      = null;
+let pausedState      = null;
+let pauseTime        = 0;
+
+
+
+function _readFormAsObj() {
+  const obj = {};
+  document.querySelectorAll('#overlayInner input, #overlayInner select').forEach(function(el) {
+    if (!el.id) return;
+    /* File inputs are excluded deliberately. Their value is a read-only path
+       ("C:\fakepath\..."), and assigning it back on the receiving side throws
+       InvalidStateError, which would abort the whole vep_start handler and
+       leave the parent waiting on "starting...". The calibration reaches the
+       child through the URL, not through this form snapshot. */
+    if (el.type === 'file') return;
+    obj[el.id] = (el.type === 'checkbox' || el.type === 'radio') ? String(el.checked) : el.value;
+  });
+  return obj;
+}
+function _applyFormObj(obj) {
+  Object.entries(obj).forEach(function([k, v]) {
+    const el = document.getElementById(k);
+    if (!el) return;
+    if (el.type === 'file') return;   // assigning to a file input throws
+    if (el.type === 'checkbox' || el.type === 'radio') { el.checked = (v === 'true'); }
+    else                        el.value   = v;
+  });
+  // Fire change on grouped/toggle inputs so dependent UI (e.g. pattern-type,
+  // conditional fields) updates to match the applied values.
+  document.querySelectorAll('#overlayInner input[type=radio], #overlayInner select')
+    .forEach(function(el){ el.dispatchEvent(new Event('change')); });
+  document.querySelectorAll('.hex-input').forEach(function(el) {
+    el.dispatchEvent(new Event('change'));
+  });
+  readParams();
+}
+function _downloadLogData(logObj) {
+  if (!logObj) return;
+  const blob = new Blob([JSON.stringify(logObj, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = logFileName(logObj); a.click();
+  URL.revokeObjectURL(url);
+}
+/* Report the canvas this child is presenting on, so the parent's APA methods
+   text describes the stimulus window rather than the settings window.
+   Sent on ready, at session start (canvas sized, fullscreen applied) and on
+   resize, because each can change the presenting surface. */
+function _reportGeometryToParent() {
+  if (!_isChild) return;
+  const w = (typeof width  === 'number' && width  > 0) ? width  : window.innerWidth;
+  const h = (typeof height === 'number' && height > 0) ? height : window.innerHeight;
+  /* The screen this window is on travels with the geometry: the operator may be
+     presenting on a different display from the one these settings were typed on,
+     and the pixel size of the two need not match. */
+  _toParent({ type: 'vep_geometry', w: w, h: h,
+              fullscreen: !!document.fullscreenElement,
+              screenW: window.screen.width,
+              dpr: window.devicePixelRatio || 1 });
+}
+
+/**
+ * Refresh-rate estimate measured *here*, in the presentation window, and sent to
+ * the settings panel.
+ *
+ * The panel's own estimate describes the display the settings window is on,
+ * which is not the one the subject looks at whenever a second monitor is used —
+ * and the two often differ, 60 Hz against 120 Hz being the common case. Marked
+ * as a probe so the parent shows it without mistaking it for the exact rate
+ * measured at session start.
+ */
+let _probeBusy = false, _probeTimer = null;
+
+
+/**
+ * Watch for the display changing under this window.
+ *
+ * Moving the window to another monitor, or changing that monitor's resolution,
+ * alters both the geometry the parent needs and the refresh rate — and neither
+ * reliably raises an event we could listen for. Polling three numbers once a
+ * second costs nothing and is the only way to notice. The refresh-rate probe is
+ * skipped unless the window is idle, so it never competes with a running
+ * stimulus for frames.
+ */
+let _screenSig = '';
+
+
+/* Start a session in this (child) stimulus window.
+
+   Fullscreen has to be requested by the window that is going fullscreen, and
+   only from a user gesture in that window. The parent's click cannot reach
+   here: a postMessage carries no user activation, so requestFullscreen() from
+   this handler is normally rejected by the browser. We still attempt it (it
+   succeeds while this window holds a recent activation of its own), and if it
+   is refused we start windowed and say so, rather than silently ignoring the
+   fullscreen setting. VEP.armFullscreenGesture (armed when this window
+   announces readiness) lets the operator put it into fullscreen beforehand,
+   with a single click. */
+function _startInChild() {
+  /* Poll for fullscreen to settle (API, OS-maximize, or virtual desktop) before
+     starting, rather than checking once (which races and can silently stall).
+     If it never settles, report back so the parent can re-block. */
+  if (!useFullscreen) { startStimulation(); return; }
+
+  let tries = 0;
+  const maxTries = 20;            // ~1 s at 50 ms
+  (function waitForFS() {
+    if (VEP.isEffectivelyFullscreen()) { startStimulation(); return; }
+    if (++tries >= maxTries) {
+      _toParent({ type: 'vep_fullscreen_denied' });
+      const msg  = document.getElementById('childWaitingMsg');
+      const hint = document.getElementById('childWaitingHint');
+      if (msg)  msg.textContent  = 'Fullscreen needed';
+      if (hint) hint.textContent = 'Make this window fullscreen (click it or press F), then Start again';
+      VEP.showChildWaiting(true);
+      return;
+    }
+    setTimeout(waitForFS, 50);
+  })();
+}
+
+/* ── Unified run controls ────────────────────────────────────────────────
+   One Start / Pause / Stop panel drives whichever surface will present the
+   stimulus: the child window if one is open, otherwise this window. */
+let _runControls = null;
+
+function _childFullscreenWanted() { return _fullscreenWanted(); }
+
+/* Has this window already installed the click/F listeners? Arming twice would
+   stack duplicate handlers on every toggle. */
+let _fsGestureArmed = false;
+
+
+
+
+
+
+/* Which query parameter fills which field. At module scope because the
+   autostart screen validates the URL against it as well, and a copy of the list
+   in two places would drift the first time a parameter was added. */
+const GET_TO_FIELD_ID = {
+  shape1: 'shape1', shape2: 'shape2', shape3: 'shape3',
+  svg1: 'svg1', svg2: 'svg2', svg3: 'svg3',
+  svg1_name: 'svg1_name', svg2_name: 'svg2_name', svg3_name: 'svg3_name',
+  hexStim1: 'hexStim1', hexStim2: 'hexStim2', hexStim3: 'hexStim3',
+  useStim3: 'useStim3', count2: 'count2', count3: 'count3',
+  hexBlank: 'hexBlank', shapeHeight: 'shapeHeight', strokeWidth: 'strokeWidth',
+  targetContrast: 'targetContrast',
+  nCycles: 'nCycles', firstStandards: 'firstStandards', minStandards: 'minStandards',
+  maxStandardRun: 'maxStandardRun', seed: 'seed',
+  onDuration: 'onDuration', offDuration: 'offDuration', offJitter: 'offJitter',
+  startDelay: 'startDelay',
+  screen_width_px: 'screen_width_px', screen_width_cm: 'screen_width_cm',
+  view_distance_cm: 'view_distance_cm',
+  displayRefreshHz: 'displayRefreshHz',
+  useFullscreen: 'useFullscreen', enableLogging: 'enableLogging',
+  dot_x: 'dot_x', dot_y: 'dot_y', syncDotFrames: 'syncDotFrames', dotSize: 'dotSize',
+  hexSync1: 'hexSync1', hexSync2: 'hexSync2', hexSync3: 'hexSync3',
+  hexFixation: 'hexFixation',
+  syncOnOnset: 'syncOnOnset', syncOnOffset: 'syncOnOffset',
+  showFixation: 'showFixation', fixationRadius: 'fixationRadius',
+  fixationThickness: 'fixationThickness',
+};
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Autostart: run from a link, without the settings panel
+   A stimulus opened with autostart=1 hides its controls and shows a
+   confirmation screen instead. That screen is not ceremony. Full-screen is only
+   granted in response to a gesture made in this window, so a click is required
+   whatever we do; since the operator has to click anyway, the click is worth
+   something — it is the one moment where a wrong figure can still be caught,
+   and hiding the panel removes every other.
+   ══════════════════════════════════════════════════════════════════════════ */
+const _isAutostart = !_isChild && paramBool('autostart', false);
+
+/** Query keys this page understands. Anything else is a typo, and in autostart
+    a typo is silent: the value falls back to a default that looks plausible in
+    the log. So they are refused rather than ignored. */
+function _knownParamKeys() {
+  /* Radio groups are addressed by name rather than by element id, so they are
+     absent from the field map and have to be listed here or a valid link would
+     be refused as a typo. */
+  return Object.keys(GET_TO_FIELD_ID).concat(
+    ['autostart', 'cal', 'cal_name', 'note', 'webgl', 'parity', 'theme']);
+}
+
+function _autostartProblems() {
+  const problems0 = (typeof p5 === 'undefined')
+    ? ['The p5.js library did not load, so no stimulus can be drawn. This page '
+       + 'needs p5.min.js in the same folder; copy it there and reload.']
+    : [];
+  const known = _knownParamKeys(), bad = [];
+  urlParams.forEach(function (_v, k) { if (known.indexOf(k) < 0) bad.push(k); });
+  const problems = problems0.concat(bad.length
+    ? ['Unrecognized parameter' + (bad.length > 1 ? 's' : '') + ': ' + bad.join(', ')]
+    : []);
+  /* Sequence, shapes and sync colours: what would stop the session anyway. */
+  startProblems().forEach(function (p) { problems.push(p); });
+  /* Name the offending fields. "One or more parameters are out of range" tells
+     the operator that something is wrong and nothing about what, which in a
+     window with no settings panel to inspect is close to useless. */
+  const form = document.getElementById('paramForm');
+  if (form && !form.checkValidity()) {
+    const names = [];
+    form.querySelectorAll('input, select').forEach(function (el) {
+      if (el.willValidate && !el.checkValidity()) names.push(el.id || el.name || '?');
+    });
+    problems.push(names.length
+      ? 'Out of range or missing: ' + names.join(', ')
+      : 'One or more parameters are out of range or missing.');
+  }
+  return problems;
+}
+
+/** The figures worth reading before a recording starts. */
+function _autostartSummary() {
+  const c = formCounts();
+  const L = stimulusLuminances();
+  const act = activeStimuli();
+  const rows = [
+    ['Stimulus', 'Oddball \u00B7 ' + act.map(i => shapeLabel(i)).join(' / ')],
+    ['Trials', nCycles + ' \u00B7 ' + act.map(i => ROLE[i] + ' ' + c[i]).join(', ')],
+    ['Timing', 'on ' + onDuration + ' ms, off ' + offDuration + ' ms'
+              + (offJitter > 0 ? ' + 0\u2013' + offJitter + ' ms jitter' : '')],
+    ['Seed', document.getElementById('seed').value || 'new, drawn at start'],
+    ['Start delay / tail', (startDelay / 1000).toFixed(1) + ' s each'],
+    /* The canvas is not sized until the session starts, so the field is stated
+       from the window this will present in — which under autostart is this one. */
+    ['Field', (window.innerWidth / pixelsPerDegree).toFixed(1) + '\u00B0 \u00D7 '
+             + (window.innerHeight / pixelsPerDegree).toFixed(1)
+             + '\u00B0 at ' + pixelsPerDegree.toFixed(1) + ' px/deg'],
+    ['Shape height', shapeHeight_deg + '\u00B0'],
+    ['Contrast', L ? act.map(i => L.stim[i].contrast != null ? (L.stim[i].contrast * 100).toFixed(1) + '%' : '\u2014').join(' / ') : '\u2014'],
+    ['Sync colors', act.map(i => rgbToHex(colSyncs[i - 1])).join(' / ')],
+    ['Calibration', gammaCalibration
+        ? (gammaCalibration.model + ' \u00B7 '
+           + (gammaCalSource === 'file' ? (gammaCalFileName || 'file') : 'from link'))
+        : 'none \u2014 sRGB assumed, no luminance reported'],
+    ['Logging', enableLogging ? 'on' + (userNote ? ' \u00B7 note: ' + userNote : '') : 'OFF'],
+  ];
+  if (declaredRefreshHz()) rows.push(['Display refresh', declaredRefreshHz() + ' Hz (entered)']);
+  return rows;
+}
+
+function _showAutostartScreen() {
+  /* Autostart presents full-screen unless the link says otherwise, and the
+     ordinary Start path is what performs the transition: it waits for the
+     browser to finish resizing before sizing the canvas and beginning. */
+  if (!urlParams.has('useFullscreen')) {
+    const fsEl = document.getElementById('useFullscreen');
+    if (fsEl) fsEl.checked = true;
+  }
+  readParams();
+  const problems = _autostartProblems();
+  const wrap = document.createElement('div');
+  wrap.id = 'autostartScreen';
+  wrap.setAttribute('style',
+    'position:fixed; inset:0; z-index:9999; display:flex; flex-direction:column;'
+    + 'align-items:center; justify-content:center; gap:1.2rem; padding:2rem;'
+    + 'background:#0f141b; color:#e6ecf4; font:16px/1.6 system-ui,-apple-system,sans-serif;'
+    + 'text-align:center;');
+  let html = '<div style="font-size:1.5rem; font-weight:600;">Oddball VEP \u2014 ready</div>';
+  html += '<table class="autostart-table" style="border-collapse:collapse;'
+        + 'font-size:.95rem; text-align:left;">';
+  _autostartSummary().forEach(function (r) {
+    html += '<tr><td style="padding:.2em 1.2em .2em 0; color:#8fa6bd;">' + r[0]
+          + '</td><td style="padding:.2em 0; color:#e6ecf4;">' + r[1] + '</td></tr>';
+  });
+  html += '</table>';
+  if (!enableLogging) problems.push('Logging is off \u2014 this run will leave no record.');
+  if (problems.length) {
+    html += '<div style="max-width:44rem; padding:.7em 1em; border-radius:.5em;'
+          + 'border:1px solid rgba(232,165,90,.45); background:rgba(232,165,90,.1);'
+          + 'color:#e8a55a; text-align:left;">' + problems.map(function (p) {
+              return '\u26A0 ' + p; }).join('<br>') + '</div>';
+  }
+  html += '<button id="autostartGo" type="button" style="font:inherit; font-size:1.1rem;'
+        + 'padding:.7em 2.4em; border-radius:.6em; border:1px solid #2c8f62;'
+        + 'background:#1f6e4a; color:#fff; cursor:pointer;">Start \u2014 click here</button>';
+  html += '<div style="max-width:34rem; font-size:.85em; color:#8fa6bd;">Clicking goes '
+        + 'full-screen and begins. <strong><kbd>Ctrl</kbd>+<kbd>Space</kbd> stops.</strong> '
+        + 'Escape leaves full-screen, which also ends the run.</div>';
+  wrap.innerHTML = html;
+  document.body.appendChild(wrap);
+  document.getElementById('autostartGo').addEventListener('click', function () {
+    wrap.remove();
+    /* This click is the user activation full-screen requires, and _runStart
+       calls requestFullscreen within the same gesture. Nothing may be deferred
+       to a timer in between or the browser withdraws the permission. */
+    _runStart();
+  });
+}
+
+
+function _runStart() {
+  const childOpen = !!(_childWin && !_childWin.closed);
+  readParams();
+  const _problems = startProblems();
+  if (_problems.length) {
+    const msg = 'Cannot start \u2014 ' + _problems.join(' ');
+    if (_isAutostart) { VEP.showChildFinished(msg); return; }
+    _refreshRunControls();
+    _runControls.status(msg);
+    return;
+  }
+  drawSeedIfNeeded();
+  try { refreshSequenceReadout(); updateURLPreview(); } catch (e) {}
+  if (childOpen) {
+    if (!_childReady || !_fullscreenGateOK()) { _refreshRunControls(); return; }
+    _toChild({ type: 'vep_start', params: _readFormAsObj(),
+               cal: gEncodeCalForURL(gammaCalibration),
+               cal_name: (gammaCalSource === 'file' ? gammaCalFileName : '') });
+    _runControls.set('measuring', 'Stimulus window: starting\u2026');
+    return;
+  }
+  readParams();
+  document.getElementById('overlay').style.display = 'none';
+  _runControls.set('measuring', 'Starting\u2026');
+  if (useFullscreen && document.documentElement.requestFullscreen) {
+    /* Enter full-screen first, and begin only once the transition has really
+       finished. A fixed delay is not enough: the promise resolves before the
+       viewport has settled, and the canvas would then be sized to the window as
+       it was beforehand — it ends up in the top-left corner at the old size,
+       with every visual angle wrong and nothing in the log to show it. */
+    let begun = false;
+    function beginOnce() {
+      if (begun) return;
+      begun = true;
+      document.removeEventListener('fullscreenchange', onFsReady);
+      requestAnimationFrame(function () { requestAnimationFrame(startStimulation); });
+    }
+    function onFsReady() { if (document.fullscreenElement) setTimeout(beginOnce, 60); }
+    document.addEventListener('fullscreenchange', onFsReady);
+    document.documentElement.requestFullscreen()
+      .then(function () { setTimeout(beginOnce, 500); })
+      .catch(function () { beginOnce(); });
+  } else {
+    startStimulation();
+  }
+}
+
+
+
+
+
+/* Live count of delivered trials, shown in the run status. */
+function _reportProgress(n, total) {
+  const msg = 'Running \u2014 trial ' + n + ' / ' + total + '.';
+  if (_isChild) { _toParent({ type: 'vep_progress', n: n, total: total }); return; }
+  if (_runControls && _runControls.state() === 'running') _runControls.status(msg);
+}
+
+if (_isChild) {
+  window.addEventListener('message', function(e) {
+    const d = e.data; if (!d || !d.type) return;
+    switch (d.type) {
+      case 'vep_fullscreen_pref':
+        _applyFullscreenPref(!!d.wanted);
+        _reportGeometryToParent();   // let the parent re-evaluate its Start gate
+        break;
+
+      case 'vep_start':
+        if ('cal' in d) _applyCalibrationFromParent(d.cal, d.cal_name);
+        if (d.params) _applyFormObj(d.params);
+        if (state === 'INIT') {
+          _startInChild();
+        } else {
+          _toParent({ type: 'vep_busy' });
+        }
+        break;
+      case 'vep_pause_toggle':
+        if      (state === 'PAUSED')                           resumeSession();
+        else if (state !== 'INIT' && state !== 'MEASURE')     pauseSession();
+        break;
+      case 'vep_stop':
+        if (state !== 'INIT') abortStimulation(false); break;
+      case 'vep_hello':
+        _activeParent = e.source || _activeParent;
+        if (_activeParent) _activeParent.postMessage({ type: 'vep_ready' }, '*');
+        break;
+    }
+  });
+}
+window.addEventListener('message', function(e) {
+  if (!_childWin || e.source !== _childWin) return;
+  const d = e.data; if (!d || !d.type) return;
+  switch (d.type) {
+    case 'vep_ready':
+      _childReady = true;
+      _refreshRunControls(); break;
+    case 'vep_fullscreen_denied':
+      _childFullscreen = false;
+      _runControls.set('blocked',
+        'Fullscreen is required. Click the stimulus window (or press F) to make it '
+        + 'fullscreen, then Start.');
+      break;
+    case 'vep_geometry':
+      _childCanvasW    = d.w | 0;
+      _childCanvasH    = d.h | 0;
+      _childFullscreen = !!d.fullscreen;
+      _childScreenW    = d.screenW ? (d.screenW | 0) : 0;
+      try { updateScreenScopeNote(); } catch (e) {}
+      try { buildAPADescription(); } catch (e) {}
+      _refreshRunControls();
+      break;
+    case 'vep_fps':
+      /* The stimulus window's rate: exact when measured at its session start,
+         an estimate (probe) when sent while idle. Kept apart from this
+         window's own measuredFPS — see presentationFPS(). */
+      if (typeof d.fps === 'number' && d.fps > 0) _childFPS = { hz: d.fps, exact: !d.probe };
+      refreshFpsDisplay();
+      try { updateRefreshMismatchNote(); } catch (e) {}
+      try { buildAPADescription(); } catch (e) {}
+      if (!d.probe && typeof d.fps === 'number' && d.fps > 0)
+        _runControls.set('measuring', 'Stimulus window: measuring… ('
+          + d.fps.toFixed(1) + ' Hz)');
+      break;
+    case 'vep_refused':
+      /* The stimulus window could not prepare the session (an SVG it could
+         not decode, say) and presented nothing. */
+      _rendererDecided = false; _childUseWebGL = null;
+      _runControls.set('idle', 'Stimulus window could not start: ' + (d.reason || 'unknown reason'));
+      break;
+    case 'vep_measuring':
+      _runControls.set('measuring', 'Stimulus window: measuring\u2026'); break;
+    case 'vep_tail':
+      _runControls.status('Stimulus window: post-stimulus baseline\u2026'); break;
+    case 'vep_running':
+      if (typeof d.webgl === 'boolean') {
+        _childUseWebGL = d.webgl; _rendererDecided = true;
+        const note = document.getElementById('rendererNote');
+        if (note) note.textContent = 'Renderer (stimulus window): '
+          + (d.webgl ? 'WebGL\u00a02 \u2713' : 'Canvas 2D');
+        try { buildAPADescription(); } catch (e) {}
+      }
+      _runControls.set('running', 'Stimulus window: running.'); break;
+    case 'vep_progress':
+      if (_runControls.state() === 'running' || _runControls.state() === 'measuring')
+        _runControls.set('running', 'Stimulus window: running \u2014 trial '
+          + d.n + ' / ' + d.total + '.');
+      break;
+    case 'vep_busy':
+      _runControls.set('idle', 'Stimulus window busy \u2014 try Start again.');
+      _refreshRunControls(); break;
+    case 'vep_paused':
+      _runControls.set('paused', 'Stimulus window: paused.'); break;
+    case 'vep_resumed':
+      _runControls.set('running', 'Stimulus window: running.'); break;
+    case 'vep_done':
+      _rendererDecided = false; _childUseWebGL = null;
+      _runControls.set('idle', 'Stimulus window: session complete \u2014 log saved.');
+      _refreshRunControls();
+      if (d.log) _downloadLogData(d.log); break;
+    case 'vep_aborted':
+      _rendererDecided = false; _childUseWebGL = null;
+      _runControls.set('idle', 'Stimulus window: stopped'
+        + (d.log ? ' \u2014 partial log saved.' : '.'));
+      _refreshRunControls();
+      if (d.log && ((d.log.trials && d.log.trials.length) ||
+                    (d.log.flashes && d.log.flashes.length))) _downloadLogData(d.log); break;
+  }
+});
+
+/* ── Standalone window ──────────────────────────────────────────────────── */
+
+
+
+
+async function getScreenInfo() {
+  const sx = window.screenX ?? window.screenLeft ?? 0;
+  const sy = window.screenY ?? window.screenTop  ?? 0;
+  const pw = window.screen.width, ph = window.screen.height;
+  const info = {
+    primary_screen_px  : { w: pw, h: ph },
+    device_pixel_ratio : window.devicePixelRatio || 1,
+    window_position    : { x: sx, y: sy },
+    window_inner_px    : { w: window.innerWidth, h: window.innerHeight },
+    is_standalone_popup: window.opener !== null,
+    likely_secondary   : sx >= pw || sx < 0 || sy >= ph || sy < 0,
+    wm_api_available   : false,
+    current_screen     : null,
+  };
+  if ('getScreenDetails' in window) {
+    try {
+      const sd = await window.getScreenDetails();
+      const cs = sd.currentScreen;
+      info.wm_api_available = true;
+      info.current_screen = { label: cs.label||null, width: cs.width,
+        height: cs.height, avail_width: cs.availWidth, avail_height: cs.availHeight,
+        device_pixel_ratio: cs.devicePixelRatio, is_primary: cs.isPrimary,
+        left: cs.left, top: cs.top };
+    } catch (_) {}
+  }
+  _screenInfo = info; return info;
+}
+
+/* ── Pause / resume ─────────────────────────────────────────────────────── */
+function _drawPauseOverlay() {
+  /* Paints the PAUSED indicator directly onto the stimulation canvas so it is
+     part of the rendered frame (guaranteed visible, mode-independent). In
+     WebGL mode the GL canvas is on top, so we rely on the DOM #pauseNote there. */
+  if (useWebGL) return;
+  const ctx = (typeof ctx2d !== 'undefined' && ctx2d) ? ctx2d : (drawingContext || null);
+  if (!ctx) return;
+  const cx = width / 2, cy = height / 2;
+  const bw = Math.min(width * 0.55, 560), bh = Math.min(height * 0.26, 180);
+  ctx.save();
+  ctx.fillStyle = 'rgba(10,20,35,0.9)';
+  const x = cx - bw/2, y = cy - bh/2, r = 12;
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.arcTo(x+bw,y,x+bw,y+bh,r); ctx.arcTo(x+bw,y+bh,x,y+bh,r);
+  ctx.arcTo(x,y+bh,x,y,r); ctx.arcTo(x,y,x+bw,y,r); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(123,200,232,0.35)'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = '#eef2f8'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = '600 ' + Math.round(bh*0.26) + 'px system-ui, sans-serif';
+  ctx.fillText('\u275a\u275a  PAUSED', cx, cy - bh*0.12);
+  ctx.fillStyle = 'rgba(238,242,248,0.75)';
+  ctx.font = Math.round(bh*0.13) + 'px system-ui, sans-serif';
+  ctx.fillText('Press Space to resume', cx, cy + bh*0.22);
+  ctx.restore();
+}
+function pauseSession() {
+  pausedState = state; pauseTime = millis(); state = 'PAUSED'; noLoop();
+  VEP.showPauseNote(true);
+  _drawPauseOverlay();
+  if (typeof enableLogging !== 'undefined' && enableLogging) {
+    logData.push({ event:'pause', session_elapsed_ms: Date.now()-(sessionStart_ms||Date.now()),
+                   timestamp_iso: new Date().toISOString() });
+  }
+  if (_isChild) _toParent({ type: 'vep_paused' });
+  else if (_runControls) _runControls.set('paused', 'Paused in this window.');
+}
+function resumeSession() {
+  const dur = millis() - pauseTime;
+  stateStart += dur;
+  state = pausedState; pausedState = null;
+  VEP.showPauseNote(false);
+  if (typeof enableLogging !== 'undefined' && enableLogging) {
+    logData.push({ event:'resume', pause_duration_ms: +dur.toFixed(1),
+                   timestamp_iso: new Date().toISOString() });
+  }
+  if (_isChild) _toParent({ type: 'vep_resumed' });
+  else if (_runControls) _runControls.set('running', 'Running in this window.');
+  _bgSafety.markFrame(); _bgSafety.start(); loop();
+}
+
+async function _checkWebGLBackground() {
+  const note=document.getElementById('rendererNote');
+  const setNote=msg=>{ if(note) note.textContent='Renderer: '+msg; };
+  setNote('detecting…');
+  const tmp=document.createElement('canvas');
+  if(!tmp.getContext('webgl2')){ setNote('Canvas 2D (WebGL 2 unavailable)'); return; }
+  const glCv=document.getElementById('glCanvas');
+  glCv.width=windowWidth; glCv.height=windowHeight;
+  try { glRenderer.init(glCv); } catch(e) { setNote('Canvas 2D (shader error)'); webglTestResult={passed:false,reason:e.message}; return; }
+  glRenderer.resize(glCv.width, glCv.height);
+  glRenderer.uploadAtlas(new Uint8Array([1]), 1, 1);
+  glRenderer.setSession({
+    W: glCv.width, H: glCv.height, background: { r: 128, g: 128, b: 128 },
+    fixation: { show: false, cx: 0, cy: 0, arm: 0, t0: 0, t1: 0, colour: { r: 0, g: 0, b: 0 } },
+    dot: { x: 32, y: 32, size: 32 },
+    shapes: [{ x0: 0, y0: 0, w: 1, h: 1, atlasY: 0, colour: { r: 255, g: 255, b: 255 } }],
+  });
+  const t0=performance.now();
+  for (let f=0;f<60;f++) glRenderer.render(f % 2, false, null);
+  glCv.getContext('webgl2').finish();
+  const dt=+(performance.now()-t0).toFixed(1);
+  webglTestResult={passed:true,timing_60f_ms:dt};
+  /* Report the renderer that will actually drive the stimulus, not merely
+     that WebGL is available. */
+  if (_effectiveWebGL()) {
+    setNote('WebGL 2 ✓  (60-frame: '+dt+' ms)');
+  } else {
+    setNote('Canvas 2D (WebGL 2 available but disabled; 60-frame: '+dt+' ms)');
+  }
+}
+
+const glRenderer = VEP.createShapeRenderer({
+  onContextLost: () => {
+    if (typeof state !== 'undefined' && state !== 'INIT') {
+      if (typeof logData !== 'undefined' && logData.length) {
+        const last = logData[logData.length-1];
+        if (last.offset_perf_ms === null || last.onset_perf_ms === null) last.webgl_context_loss_truncated = true;
+        logData.push({ event:'webgl_context_loss', timestamp_iso:new Date().toISOString() });
+      }
+      noLoop(); state='INIT'; cursor();
+      const ov=document.getElementById('overlay'); if (ov && !_isChild) ov.style.display='flex';
+      const warn=document.getElementById('bgWarn');
+      if (warn){ warn.textContent='⚠️ WebGL context lost — session aborted.'; warn.style.display='block'; }
+      useWebGL=false;
+      if (typeof enableLogging!=='undefined' && enableLogging && typeof logData!=='undefined' && logData.length) downloadLog();
+    }
+  },
+  updateBadge: _updateBadge
+});
+/* ── Light / dark theme toggle ── */
+(function () {
+  var KEY  = 'vep_theme';
+  var SUN  = '\u2600';  // ☀  shown in dark mode (click to go light)
+  var MOON = '\u25D7';  // ◗  shown in light mode (click to go dark)
+
+  function applyTheme(t) {
+    document.documentElement.setAttribute('data-theme', t || 'dark');
+    var btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.textContent = (t === 'light') ? MOON : SUN;
+  }
+
+  /* The bootstrap in <head> has already resolved the theme; follow it rather
+     than reading the store again, which would undo a theme passed in the URL. */
+  applyTheme(document.documentElement.getAttribute('data-theme') || 'dark');
+
+  document.addEventListener('DOMContentLoaded', function () {
+    applyTheme(document.documentElement.getAttribute('data-theme') || 'dark');
+    var btn = document.getElementById('themeToggleBtn');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+        try { localStorage.setItem(KEY, next); } catch (e) {}
+        applyTheme(next);
+      });
+    }
+
+    /* Hand the theme to the next page of the suite. The href is rewritten on
+       the way out, so links the page rebuilds at runtime are covered too. */
+    document.addEventListener('click', function (e) {
+      var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+      if (!a) return;
+      var href = a.getAttribute('href') || '';
+      if (!href || href.charAt(0) === '#') return;
+      var u;
+      try { u = new URL(a.href, location.href); } catch (err) { return; }
+      if (u.protocol !== location.protocol || !/\.html$/i.test(u.pathname)) return;
+      u.searchParams.set('theme', document.documentElement.getAttribute('data-theme') || 'dark');
+      a.href = u.toString();
+    }, true);
+  });
+})();
+
+</script>
+
+<!-- Colour picker popup -->
+<div id="colorPicker">
+  <canvas id="pickerWheel" width="160" height="160"></canvas>
+  <input id="pickerSlider" type="range" min="0" max="100" value="50">
+  <div id="pickerPreview"></div>
+  <button id="pickerClose">OK</button>
+</div>
+
+
+<canvas id="glCanvas"></canvas>
+
+<div id="childWaiting" style="display:none; position:fixed; top:50%; left:50%;
+     transform:translate(-50%,-50%); background:rgba(10,20,35,.88); color:#eef2f8;
+     padding:1.1em 2.4em; border-radius:.55em; font-size:1.35em; font-family:inherit;
+     text-align:center; border:1px solid rgba(123,200,232,.28); z-index:50;
+     cursor:pointer; line-height:1.5;">
+  <span id="childWaitingMsg">Awaiting start signal</span>
+  <div id="childWaitingHint" style="font-size:.52em; color:#7bc8e8; margin-top:.4em; font-weight:400;">
+    Click here (or press <kbd style="background:rgba(255,255,255,.14); padding:.1em .4em;
+    border-radius:.2em; font-family:inherit;">F</kbd>) for fullscreen
+  </div>
+</div>
+
+<div id="pauseNote" style="display:none; position:fixed; top:50%; left:50%;
+     transform:translate(-50%,-50%); background:rgba(10,20,35,.88); color:#eef2f8;
+     padding:1.1em 2.4em; border-radius:.55em; font-size:1.35em; font-family:inherit;
+     text-align:center; border:1px solid rgba(123,200,232,.28); z-index:2147483000;
+     pointer-events:none; line-height:1.5;">
+  &#9646;&#9646;&ensp;PAUSED
+  <div style="font-size:.52em; color:#7bc8e8; margin-top:.4em; font-weight:400;">
+    Press <kbd style="background:rgba(255,255,255,.14); padding:.1em .4em;
+    border-radius:.2em; font-family:inherit;">Space</kbd> to resume
+  </div>
+</div>
+
+</body>
+</html>

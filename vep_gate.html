@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<!--
+  VEP Stimulus Gate
+  =================
+  Author : Jan Kremlacek
+  Version: 1.2.0
+  License: MIT
+
+  Description
+  -----------
+  A central configuration page for the four VEP stimulus programmes.
+  Environment parameters (session note, screen and room geometry, display
+  refresh, full-screen, synchronisation, logging, calibration) are set here
+  and substituted into each condition link of the protocol. Conditions are
+  saved stimulus links; Run starts one in autostart mode, Page opens its
+  stimulus page with the same parameters.
+
+  Stimulus pages expected in the same directory:
+    flash_vep.html
+    pattern_reversal_vep.html
+    pattern_onset_vep.html
+    motion_onset_vep.html
+
+  GET parameters (all optional — same names as the stimulus pages)
+  ----------------------------------------------------------------
+  screen_width_px, screen_width_cm, view_distance_cm, displayRefreshHz,
+  useFullscreen, dot_x, dot_y, dotSize, syncDotFrames,
+  enableLogging, note, cal, cal_name
+
+  Fixation, masking and everything that defines the stimulus itself stay with
+  the stimulus pages: this page describes the room and the display, not the
+  experiment.
+-->
+<html lang="en" class="page-gate">
+<head>
+  <meta charset="UTF-8" />
+  <script>(function(){
+    /* Theme, in order of precedence: the ?theme= parameter another page of the
+       suite passed on, the choice stored here, the system preference. Over
+       file:// the store is per-page, so the parameter is the only way across. */
+    var q = new URLSearchParams(location.search).get('theme');
+    var t = (q === 'light' || q === 'dark') ? q : null;
+    try { t = t || localStorage.getItem('vep_theme'); } catch (e) {}
+    if (!t && window.matchMedia)
+      t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', t || 'dark');
+    if (q === 'light' || q === 'dark') { try { localStorage.setItem('vep_theme', q); } catch (e) {} }
+  })()</script>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNSIgZmlsbD0iIzBkMGQwZCIvPgogIDxsaW5lIHgxPSIxNiIgeTE9IjExIiB4Mj0iMTYiIHkyPSI2IiAgc3Ryb2tlPSIjNTU1IiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CiAgPGxpbmUgeDE9IjE2IiB5MT0iMjEiIHgyPSIxNiIgeTI9IjI2IiBzdHJva2U9IiM1NTUiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8bGluZSB4MT0iMTEiIHkxPSIxNiIgeDI9IjYiICB5Mj0iMTYiIHN0cm9rZT0iIzU1NSIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxsaW5lIHgxPSIyMSIgeTE9IjE2IiB4Mj0iMjYiIHkyPSIxNiIgc3Ryb2tlPSIjNTU1IiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CiAgPGNpcmNsZSBjeD0iMTYiIGN5PSIxNiIgcj0iNS41IiBmaWxsPSIjZmZmIi8+CiAgPHJlY3QgeD0iMiIgIHk9IjIiICB3aWR0aD0iNyIgaGVpZ2h0PSI3IiByeD0iMS41IiBmaWxsPSIjZGRkIi8+CiAgPHJlY3QgeD0iMjMiIHk9IjIiICB3aWR0aD0iNyIgaGVpZ2h0PSI3IiByeD0iMS41IiBmaWxsPSIjYWFhIi8+CiAgPHJlY3QgeD0iMiIgIHk9IjIzIiB3aWR0aD0iNyIgaGVpZ2h0PSI3IiByeD0iMS41IiBmaWxsPSIjODg4Ii8+CiAgPHJlY3QgeD0iMjMiIHk9IjIzIiB3aWR0aD0iNyIgaGVpZ2h0PSI3IiByeD0iMS41IiBmaWxsPSIjNTU1Ii8+Cjwvc3ZnPg==">
+  <title>VEPeagle — Stimulus Gate</title>
+  <link rel="stylesheet" href="vep.css">
+</head>
+<body>
+
+<div id="overlay">
+<div id="overlayInner">
+<button id="themeToggleBtn" class="theme-toggle-btn" title="Switch light/dark theme" aria-label="Toggle light/dark theme">&#9728;</button>
+
+
+  <h2>VEP Stimulus Gate</h2>
+  <div class="page-subtitle">The room and the display · Launch stimuli</div>
+
+  <details class="t-dim" style="margin:0 0 1.6em; font-size:.86em; line-height:1.6" >
+    <summary class="t-faint" style="cursor:pointer; font-size:.92em" >What this page controls</summary>
+    <div style="margin-top:.6em; padding:.7em .9em; border-radius:.5em;
+                border:1px solid rgba(123,200,232,.22); background:rgba(0,0,0,.25);">
+      Screen size, viewing distance and display calibration are what let a stimulus keep its
+      intended luminance, color and spatial properties on a different monitor. Set them here
+      and every condition launched from this page inherits them. The sync dot &mdash; position,
+      size, on-time and color &mdash; is set here as well, since it follows the photodiode and
+      the recording system rather than the stimulus. This browser remembers all of this
+      between visits; the session note is not remembered, since it names a subject.
+      <br><br>
+      <span class="t-slate" >What the stimulus <em>is</em> &mdash; spatial frequency,
+      colors, timing, fixation, masking &mdash; belongs to the stimulus pages, and this page
+      does not touch it.</span>
+    </div>
+  </details>
+
+  <!-- Settings applied from the link that opened this page (see showEnvNotice) -->
+  <div id="envNotice" style="display:none; margin:0 0 1.4em; padding:.6em .85em; font-size:.84em;
+       line-height:1.5; border-radius:.45em; border:1px solid rgba(232,165,90,.45);
+       background:rgba(232,165,90,.08); color:#e8a55a;"></div>
+
+  <!-- ══ SESSION ══ -->
+  <div class="section">
+    <div class="section-head"><div class="section-title">Session</div></div>
+    <div style="display:flex; gap:.9em; align-items:flex-end; flex-wrap:wrap;">
+      <div style="flex:1 1 220px; min-width:180px;">
+        <label>Session note</label>
+        <input id="noteField" type="text" placeholder="Subject code / condition&hellip;">
+      </div>
+      <label class="inline" style="padding-bottom:.35em;">
+        <input id="useFullscreen" type="checkbox" checked>
+        Fullscreen
+      </label>
+      <label class="inline" style="padding-bottom:.35em;">
+        <input id="enableLogging" type="checkbox">
+        Save log
+      </label>
+    </div>
+  </div>
+
+  <!-- ══ PROTOCOL ══ -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-title">Conditions</div>
+      <span class="t-faint" style="font-size:.78em"  id="condCount"></span>
+    </div>
+    <div id="condList"></div>
+    <div class="t-faint" style="font-size:.82em; line-height:1.55" id="condEmpty" >
+      Nothing here yet. Configure a condition on a stimulus page, copy the link it shows, and
+      paste it below. The conditions you add here are run in sequence during a session.
+    </div>
+
+    <details style="margin-top:1em;">
+      <summary class="t-faint" style="cursor:pointer; font-size:.82em" >Add a condition</summary>
+      <div style="height:.5em"></div>
+      <input id="newCondName" type="text" placeholder="Name, e.g. Reversal 1&deg; checks">
+      <div style="height:.45em"></div>
+      <div style="display:flex; gap:.6em; align-items:center;">
+        <input id="newCondUrl" type="text" style="flex:1 1 auto;"
+               placeholder="pattern_reversal_vep.html?patternType=checker&amp;&hellip;">
+        <button id="condAddBtn" type="button" class="pill-btn">Add</button>
+      </div>
+      <div class="t-faint" style="font-size:.78em; line-height:1.5; margin-top:.5em" >
+        Configure the condition on its stimulus page, copy the link it shows, and paste it
+        here. Screen, sync and calibration are supplied by this page at launch and are not
+        stored with the condition. If the link carries different values for them &mdash; a dot
+        size changed on the stimulus page, say &mdash; you are asked which to keep.
+      </div>
+    </details>
+  </div>
+
+  <!-- ══ PROTOCOL FILE ══ -->
+  <details class="setup">
+    <summary>Protocol file</summary>
+    <div style="display:flex; gap:.6em; flex-wrap:wrap; align-items:center;">
+      <button id="protoExportBtn" type="button" class="pill-btn">&darr; Download protocol .json</button>
+      <label class="pill-btn" for="protoImportInput">Load protocol .json&hellip;</label>
+      <input id="protoImportInput" type="file" accept=".json,application/json" style="display:none">
+      <button id="protoClearBtn" type="button" class="pill-btn danger">Clear all</button>
+      <span class="t-faint" style="font-size:.8em" id="protoMsg" ></span>
+    </div>
+    <div class="t-faint" style="font-size:.8em; line-height:1.55; margin-top:.5em" >
+      The list is kept in this browser for convenience, which is not an archive: clearing
+      browsing data removes it and another machine has nothing. Download the protocol and keep
+      it with the study. The file also records the screen, room and synchronization settings
+      below; loading it offers them, it does not impose them.
+    </div>
+  </details>
+
+  <form id="paramForm" onsubmit="return false;" autocomplete="off">
+
+    <!-- ══ SCREEN ══ -->
+    <details class="setup" id="screenDetails">
+      <summary>Screen &amp; room<span class="sum" id="screenSummary"></span></summary>
+      <div class="field-grid cols-3">
+        <div>
+          <label>Width (px) <span style="opacity:.45; font-size:.88em;">auto</span></label>
+          <input id="screen_width_px" type="number" step="1" required>
+        </div>
+        <div>
+          <label>Width (cm)</label>
+          <input min="0.1" id="screen_width_cm" type="number" step="any" value="53" required>
+        </div>
+        <div>
+          <label>View distance (cm)</label>
+          <input min="1" id="view_distance_cm" type="number" step="any" value="57" required>
+        </div>
+        <div>
+          <label>Display refresh (Hz) <span style="opacity:.45; font-size:.88em;">optional</span></label>
+          <input id="displayRefreshHz" type="number" step="1" min="1" placeholder="e.g. 60"
+                 title="What the operating system reports for the display the subject sees. No browser API exposes it.">
+        </div>
+      </div>
+    </details>
+
+    <!-- ══ CALIBRATION ══ -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">Display calibration</div>
+        <a href="display_calibration.html" target="vep_calibration"
+           style="font-size:.82em;color:#7bc8e8;text-decoration:none">
+          Open calibration page &rarr;
+        </a>
+      </div>
+      <div class="t-mute" style="padding:.42em .7em; border-radius:.4em; font-size:.88em; line-height:1.55; border:1px solid rgba(255,255,255,.1); background:rgba(0,0,0,.25)" id="gateCalStatus" >Loading&hellip;</div>
+      <div style="margin-top:.55em; display:flex; gap:.6em; align-items:center; flex-wrap:wrap;">
+        <label for="calLoadInput" style="
+          display:inline-block; padding:.32em .85em; font-size:.82em;
+          border-radius:1.2em; border:1px solid rgba(123,200,232,.3);
+          background:rgba(0,0,0,.3); color:#7bc8e8; cursor:pointer; margin:0;">
+          Load calibration .json file&hellip;
+        </label>
+        <input id="calLoadInput" type="file" accept=".json,application/json"
+          style="display:none">
+        <span class="t-faint" style="font-size:.78em" id="calFileMsg" ></span>
+      </div>
+      <div class="t-faint" style="margin-top:.4em; font-size:.76em; line-height:1.5" >
+        Browser storage may not work between local files in some browsers.
+        Loading the calibration file here passes it to every stimulus via URL parameter.
+      </div>
+    </div>
+
+    <!-- ══ SYNCHRONISATION ══ -->
+    <details class="setup">
+      <summary>Synchronization<span class="sum" id="syncSummary"></span></summary>
+      <div class="field-grid cols-4">
+        <div>
+          <label>Dot X (px)</label>
+          <input id="dot_x" type="number" step="1" value="32">
+        </div>
+        <div>
+          <label>Dot Y (px)</label>
+          <input id="dot_y" type="number" step="1" value="32">
+        </div>
+        <div>
+          <label>Dot size (px)</label>
+          <input id="dotSize" type="number" step="1" min="1" value="32">
+        </div>
+        <div>
+          <label>Dot on-time (frames)</label>
+          <input id="syncDotFrames" type="number" step="1" min="1" value="2">
+        </div>
+      </div>
+      <div style="margin-top:.9em;">
+        <label>Dot color when triggered &mdash; black between triggers</label>
+        <div style="display:flex; flex-wrap:wrap; gap:.6em 1.6em; align-items:center; margin-top:.35em;">
+          <div class="colour-pair" title="Single-stimulus pages (flash, reversal, onset, motion), and the standard of a multi-stimulus page">
+            <span>Stimulus&nbsp;1</span>
+            <span class="swatch" id="swatch_hexSync1" style="background:#ffffff;"></span>
+            <input class="hex-input" id="hexSync1" type="text" maxlength="7" value="#ffffff">
+          </div>
+          <div class="colour-pair" title="Second stimulus of a multi-stimulus page">
+            <span>Stimulus&nbsp;2</span>
+            <span class="swatch" id="swatch_hexSync2" style="background:#ff0000;"></span>
+            <input class="hex-input" id="hexSync2" type="text" maxlength="7" value="#ff0000">
+          </div>
+          <div class="colour-pair" title="Third stimulus of a multi-stimulus page">
+            <span>Stimulus&nbsp;3</span>
+            <span class="swatch" id="swatch_hexSync3" style="background:#00ff00;"></span>
+            <input class="hex-input" id="hexSync3" type="text" maxlength="7" value="#00ff00">
+          </div>
+        </div>
+        <div style="margin-top:.45em; font-size:.8em; line-height:1.5" class="field-note t-mute" >
+          Stimulus&nbsp;1 is the color every single-stimulus page uses. Stimuli&nbsp;2 and 3
+          apply only to pages that present more than one stimulus (Oddball VEP), where each stimulus fires
+          the dot in its own color so the recording can tell them apart. White suits a
+          luminance photodiode; single primaries suit an RGB photodiode.
+        </div>
+        <div id="syncWarn" style="display:none; margin-top:.4em; font-size:.8em; color:#e8a55a;"></div>
+      </div>
+    </details>
+
+    <!-- ══ LAUNCH ══ -->
+    <details class="setup">
+      <summary>Open a stimulus page<span class="sum">to build a new condition</span></summary>
+      <div class="launch-area" style="margin-top:.2em;">
+
+      <!-- Four launch buttons -->
+      <div class="launch-grid">
+
+        <a id="btnFlash" class="launch-btn" href="#" target="vep_settings_flash">
+          <div class="launch-btn-head">
+            <div class="launch-btn-title">Flash VEP</div>
+            <div class="launch-btn-abbr">FVEP · Full-field luminance</div>
+          </div>
+          <div class="launch-btn-body">
+            Full-field luminance flash at a configurable frequency and duration in frames.
+          </div>
+          <div class="launch-btn-footer">Open flash_vep.html</div>
+        </a>
+
+        <a id="btnReversal" class="launch-btn" href="#" target="vep_settings_reversal">
+          <div class="launch-btn-head">
+            <div class="launch-btn-title">Pattern Reversal VEP</div>
+            <div class="launch-btn-abbr">PRVEP · Checkerboard · Radial</div>
+          </div>
+          <div class="launch-btn-body">
+            Checkerboard or radial sinusoidal grating reversing at a set rate in Hz.
+          </div>
+          <div class="launch-btn-footer">Open pattern_reversal_vep.html</div>
+        </a>
+
+        <a id="btnOnset" class="launch-btn" href="#" target="vep_settings_onset">
+          <div class="launch-btn-head">
+            <div class="launch-btn-title">Pattern Onset VEP</div>
+            <div class="launch-btn-abbr">POVEP · Checkerboard · Radial</div>
+          </div>
+          <div class="launch-btn-body">
+            Pattern appears for a set ON duration, then a blank screen for OFF duration.
+          </div>
+          <div class="launch-btn-footer">Open pattern_onset_vep.html</div>
+        </a>
+
+        <a id="btnMotion" class="launch-btn" href="#" target="vep_settings_motion">
+          <div class="launch-btn-head">
+            <div class="launch-btn-title">Motion Onset VEP</div>
+            <div class="launch-btn-abbr">MOVEP · Radial CMF-weighted</div>
+          </div>
+          <div class="launch-btn-body">
+            Radial sinusoidal grating moves for a set duration, then holds stationary.
+          </div>
+          <div class="launch-btn-footer">Open motion_onset_vep.html</div>
+        </a>
+
+        <a id="btnOddball" class="launch-btn" href="#" target="vep_settings_oddball">
+          <div class="launch-btn-head">
+            <div class="launch-btn-title">Oddball VEP</div>
+            <div class="launch-btn-abbr">Standard · deviant · third</div>
+          </div>
+          <div class="launch-btn-body">
+            Shapes (X, O, + or SVG) in a seeded pseudorandom order; each stimulus fires the sync dot in its own color.
+          </div>
+          <div class="launch-btn-footer">Open oddball_vep.html</div>
+        </a>
+
+      </div><!-- end launch-grid -->
+
+      <!-- Post-stimulation tools -->
+      <div class="t-mute" style="margin-top:1.4em; padding-top:1em; border-top:1px solid rgba(255,255,255,.07); font-size:.85em" >
+        <strong style="color:#7bc8e8; letter-spacing:.04em; font-weight:600;">After stimulation:</strong>
+        <a href="vep_log_analyzer.html" target="vep_analyzer"
+           style="color:#7bc8e8; text-decoration:none; margin-left:.4em;">
+          Open log analyzer →
+        </a>
+        <span class="t-faint" style="font-size:.92em; margin-left:.4em" >
+          Compute timing statistics from a saved JSON log.
+        </span>
+      </div>
+
+      </div><!-- end launch-area -->
+    </details>
+
+  </form>
+
+  <!-- Footer -->
+  <div class="t-steel" style="margin-top:2em; padding-top:.7em; border-top: 1px solid rgba(255,255,255,.07); display:flex; justify-content:space-between; align-items:center; font-size:.72em; flex-wrap:wrap; gap:.3em" >
+    <span>VEP Stimulus Gate &nbsp;&mdash;&nbsp; v1.2.0</span>
+    <span><a href="manual.html#gate" target="vep_manual" style="color:#7bc8e8; text-decoration:none;">Help &amp; documentation</a></span>
+    <span>&copy; 2026 Jan Kremlacek &mdash; MIT License</span>
+  </div>
+
+</div><!-- end overlayInner -->
+</div><!-- end overlay -->
+
+
+<script src="vep_engine.js"></script>
+<script>
+/* The gate is the launcher: if vep_engine.js is missing it must say so rather
+   than failing silently on the first VEP.* reference and leaving a page that
+   looks fine but builds links without calibration. */
+if (typeof VEP === 'undefined' || !VEP.encodeCalForURL) {
+  document.addEventListener('DOMContentLoaded', function () {
+    const el = document.getElementById('gateCalStatus');
+    if (el) {
+      el.textContent = 'vep_engine.js could not be loaded \u2014 keep it in the same '
+                     + 'folder as this page, otherwise calibration cannot be passed on.';
+      el.style.borderColor = 'rgba(232,165,90,.4)';
+    }
+  });
+  throw new Error('vep_engine.js not loaded');
+}
+
+const urlParams = new URLSearchParams(window.location.search);
+
+/* ══════════════════════════════════════════════════════════════════════════
+   The environment: the parameters this page owns
+   The room, the display and the synchronisation patch. They are substituted
+   into every condition at launch, so recalibrating or moving to another monitor
+   updates the whole protocol at once. Everything else — pattern, colours,
+   timing, fixation, masking — belongs to the condition and is never touched.
+   ══════════════════════════════════════════════════════════════════════════ */
+const SHARED_KEYS = [
+  'screen_width_px', 'screen_width_cm', 'view_distance_cm', 'displayRefreshHz',
+  'useFullscreen', 'dot_x', 'dot_y', 'dotSize', 'syncDotFrames',
+  'hexSync1', 'hexSync2', 'hexSync3',
+  'enableLogging', 'note', 'cal', 'cal_name',
+];
+
+/* Sync-dot colours, one per stimulus. Every page knows hexSync1; only pages
+   that present several stimuli know the others, and a page in autostart refuses
+   a parameter it does not know — so the extra colours are sent only to those
+   pages (see substituteShared). */
+const SYNC_HEX_KEYS = ['hexSync1', 'hexSync2', 'hexSync3'];
+const MULTI_STIMULUS_FILES = ['oddball_vep.html'];
+
+/* Keys that never belong to a stored condition: they describe how a page was
+   opened, not what it presents. */
+/* Keys this page owns and therefore never stores in a condition: they are
+   added when a link is opened, not when it is saved. */
+const LAUNCH_KEYS = ['autostart', 'parity', 'theme'];
+
+/* The subset of the environment that is a form field here and is remembered
+   between visits, keyed by URL parameter (each is also its element id). The
+   session note is deliberately absent: it names a subject, and carrying it
+   silently into the next session would label someone else's recording. The
+   calibration is remembered on its own terms further down. */
+const ENV_KEYS = [
+  'screen_width_px', 'screen_width_cm', 'view_distance_cm', 'displayRefreshHz',
+  'dot_x', 'dot_y', 'dotSize', 'syncDotFrames', 'hexSync1', 'hexSync2', 'hexSync3',
+  'useFullscreen', 'enableLogging',
+];
+const ENV_HEX  = new Set(SYNC_HEX_KEYS);
+const ENV_BOOL = new Set(['useFullscreen', 'enableLogging']);
+const ENV_LABEL = {
+  screen_width_px: 'Screen width (px)', screen_width_cm: 'Screen width (cm)',
+  view_distance_cm: 'View distance (cm)', displayRefreshHz: 'Display refresh (Hz)',
+  dot_x: 'Dot X (px)', dot_y: 'Dot Y (px)', dotSize: 'Dot size (px)',
+  syncDotFrames: 'Dot on-time (frames)', useFullscreen: 'Fullscreen',
+  hexSync1: 'Dot color, stimulus 1', hexSync2: 'Dot color, stimulus 2',
+  hexSync3: 'Dot color, stimulus 3',
+  enableLogging: 'Save log',
+};
+const LS_ENV = 'vep_gate_env';
+
+/** Yes/no as the stimulus pages read it: true/false, 1/0, yes/no, on/off. */
+function boolOf(v) {
+  return ['1', 'true', 'yes', 'on'].indexOf(String(v).trim().toLowerCase()) >= 0;
+}
+
+/** '#rrggbb' in lower case, or '' when the text is not a colour. Accepts the
+    short form (#f00) and a missing '#', as the stimulus pages do. */
+function normHex(v) {
+  let h = String(v == null ? '' : v).trim().replace(/^#/, '').toLowerCase();
+  if (/^[0-9a-f]{3}$/.test(h)) h = h.split('').map(c => c + c).join('');
+  return /^[0-9a-f]{6}$/.test(h) ? '#' + h : '';
+}
+
+/* Last valid colour per field. A half-typed code is never sent to a stimulus;
+   the field shows it as invalid and the launch uses the last valid value. */
+const hexLastValid = { hexSync1: '#ffffff', hexSync2: '#ff0000', hexSync3: '#00ff00' };
+
+function hexShow(id, h) {
+  const sw = document.getElementById('swatch_' + id);
+  if (sw) sw.style.background = h;
+}
+
+/** The environment as it stands in the form, as strings ('true'/'false' for
+    the two checkboxes), which is also the form it takes in a link. */
+function envRead() {
+  const out = {};
+  ENV_KEYS.forEach(k => {
+    const el = document.getElementById(k);
+    if (!el) return;
+    out[k] = ENV_BOOL.has(k) ? String(el.checked)
+           : ENV_HEX.has(k)  ? (normHex(el.value) || hexLastValid[k])
+           : String(el.value).trim();
+  });
+  return out;
+}
+
+/** Write environment values into the form. Keys that are absent are left alone. */
+function envApply(obj) {
+  if (!obj) return;
+  ENV_KEYS.forEach(k => {
+    if (!(k in obj)) return;
+    const el = document.getElementById(k);
+    if (!el) return;
+    if (ENV_BOOL.has(k)) el.checked = boolOf(obj[k]);
+    else if (ENV_HEX.has(k)) {
+      const h = normHex(obj[k]);
+      if (!h) return;                       // not a colour: keep what is there
+      el.value = h; hexLastValid[k] = h; el.classList.remove('invalid'); hexShow(k, h);
+    }
+    else el.value = obj[k] == null ? '' : String(obj[k]);
+  });
+}
+
+function envSave() {
+  try { localStorage.setItem(LS_ENV, JSON.stringify(envRead())); } catch (e) {}
+}
+function envLoad() {
+  try {
+    const o = JSON.parse(localStorage.getItem(LS_ENV) || 'null');
+    return (o && typeof o === 'object') ? o : null;
+  } catch (e) { return null; }
+}
+
+/** Do two values of one key say the same thing? '53' and '53.0' do; an empty
+    field and an absent one do; true and 'yes' do. */
+function envSame(key, a, b) {
+  if (ENV_BOOL.has(key)) return boolOf(a) === boolOf(b);
+  if (ENV_HEX.has(key))  return normHex(a) === normHex(b);
+  const sa = (a == null) ? '' : String(a).trim();
+  const sb = (b == null) ? '' : String(b).trim();
+  if (sa === sb) return true;
+  if (sa === '' || sb === '') return false;
+  const na = Number(sa), nb = Number(sb);
+  return isFinite(na) && isFinite(nb) && na === nb;
+}
+
+/** Where `incoming` disagrees with `current`, key by key, for keys it carries. */
+function envDiff(current, incoming) {
+  const out = [];
+  ENV_KEYS.forEach(k => {
+    if (!incoming || !(k in incoming)) return;
+    if (!envSame(k, current[k], incoming[k])) out.push({ key: k, from: current[k], to: incoming[k] });
+  });
+  return out;
+}
+
+function envShow(key, v) {
+  if (ENV_BOOL.has(key)) return boolOf(v) ? 'on' : 'off';
+  const s = (v == null) ? '' : String(v).trim();
+  return s === '' ? '(empty)' : s;
+}
+
+/** Everything that has to follow a change of the environment. */
+function envChanged() {
+  envSave();
+  updateSummaries();
+  updateLinks();
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   URL builder
+   ══════════════════════════════════════════════════════════════════════════ */
+const BASE = window.location.href.split('?')[0].split('#')[0]
+               .split('/').slice(0, -1).join('/') + '/';
+
+/**
+ * Write this page's shared settings into a condition's parameters.
+ *
+ * The calibration is substituted the same way as the rest: when this page has
+ * none, the condition runs without one and the stimulus says so. Keeping a
+ * calibration that happened to be embedded in a saved link would be the one
+ * failure this arrangement exists to prevent — a stale calibration that still
+ * works and leaves a plausible-looking log.
+ */
+function substituteShared(p, file) {
+  const el = id => document.getElementById(id);
+  /* Sync colours: the first to every page, all three only to pages that
+     present several stimuli. A stale extra colour in a stored link is removed
+     either way. */
+  const multi = MULTI_STIMULUS_FILES.indexOf(String(file || '').split('/').pop()) >= 0;
+  SYNC_HEX_KEYS.forEach((k, i) => {
+    p.delete(k);
+    if (i === 0 || multi) {
+      const e = el(k);
+      p.set(k, (e && normHex(e.value)) || hexLastValid[k]);
+    }
+  });
+  ['screen_width_px', 'screen_width_cm', 'view_distance_cm', 'displayRefreshHz',
+   'dot_x', 'dot_y', 'dotSize', 'syncDotFrames'].forEach(id => {
+    const e = el(id);
+    if (!e) return;
+    if (String(e.value).trim() === '') p.delete(id); else p.set(id, String(e.value).trim());
+  });
+  ['useFullscreen', 'enableLogging'].forEach(id => {
+    const e = el(id);
+    if (e) p.set(id, String(e.checked));
+  });
+  const note = el('noteField');
+  if (note && note.value.trim() !== '') p.set('note', note.value.trim()); else p.delete('note');
+
+  p.delete('cal'); p.delete('cal_name');
+  const calStr = window.__gateGetCalParam ? window.__gateGetCalParam() : '';
+  if (calStr) {
+    p.set('cal', calStr);
+    const calName = window.__gateGetCalName ? window.__gateGetCalName() : '';
+    if (calName) p.set('cal_name', calName);
+  }
+  return p;
+}
+
+function makeURL(filename, extraParams) {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(extraParams)) p.set(k, v);
+  substituteShared(p, filename);
+  /* The tile is rebuilt at the moment of the click, so the theme belongs here
+     rather than in the generic link handler, whose rewrite this would undo. */
+  p.set('theme', document.documentElement.getAttribute('data-theme') || 'dark');
+  return BASE + filename + '?' + p.toString();
+}
+
+/* The launch tiles. Rebuilt on every change and again at the moment of the
+   click, so a tile never carries a value the form no longer shows. */
+function updateLinks() {
+  const set = (id, url) => { const a = document.getElementById(id); if (a) a.href = url; };
+  set('btnFlash',    makeURL('flash_vep.html',            { syncOnFlash: true }));
+  set('btnReversal', makeURL('pattern_reversal_vep.html', { syncOnReversal: true }));
+  set('btnOnset',    makeURL('pattern_onset_vep.html',    { syncOnOnset: true, syncOnOffset: false }));
+  set('btnMotion',   makeURL('motion_onset_vep.html',     { syncOnOnset: true, syncOnOffset: false }));
+  set('btnOddball',  makeURL('oddball_vep.html',          { syncOnOnset: true, syncOnOffset: false }));
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Protocol: the conditions of one examination, in order
+   A condition is a link to a stimulus page with its parameters, stored without
+   the environment. What this page contributes at launch is the room, the
+   display and the calibration — see substituteShared() above.
+   ══════════════════════════════════════════════════════════════════════════ */
+const LS_PROTOCOL = 'vep_protocol';
+let conditions = [];
+
+function protoSave() {
+  try { localStorage.setItem(LS_PROTOCOL, JSON.stringify(conditions)); } catch (e) {}
+}
+
+/**
+ * Split a stimulus link into the condition proper and what it carried besides.
+ * Every way a condition enters the protocol — Add, ↻, a loaded file, or what an
+ * older version left in browser storage — goes through here, so a stored
+ * condition never holds an environment that would later be silently ignored.
+ */
+function stripLink(url) {
+  const q = url.indexOf('?');
+  const base = q < 0 ? url : url.slice(0, q);
+  const p = new URLSearchParams(q < 0 ? '' : url.slice(q + 1));
+  const shared = {};
+  SHARED_KEYS.forEach(k => { if (p.has(k)) { shared[k] = p.get(k); p.delete(k); } });
+  LAUNCH_KEYS.forEach(k => p.delete(k));
+  const qs = p.toString();
+  return { url: base + (qs ? '?' + qs : ''), shared: shared };
+}
+
+function protoLoad() {
+  let raw = [];
+  try { raw = JSON.parse(localStorage.getItem(LS_PROTOCOL) || '[]') || []; }
+  catch (e) { raw = []; }
+  if (!Array.isArray(raw)) raw = [];
+  conditions = raw.filter(c => c && typeof c.url === 'string')
+                  .map(c => ({ name: String(c.name || ''), url: stripLink(c.url).url }));
+  protoSave();
+}
+
+/**
+ * A pasted link may carry room or display settings that differ from this page —
+ * typically a dot size or a viewing distance changed on the stimulus page. They
+ * are not stored with the condition either way, because this page supplies them
+ * at launch; but dropping them without a word is how such an edit used to
+ * vanish. So say what differs and let the operator choose which side wins.
+ * Returns false only if the operator cancels the whole operation.
+ */
+function offerSharedFromLink(shared) {
+  const diffs = envDiff(envRead(), shared);
+  if (!diffs.length) return true;
+  const lines = diffs.map(d => '  ' + ENV_LABEL[d.key] + ': ' + envShow(d.key, d.to)
+                             + ' in the link, ' + envShow(d.key, d.from) + ' here');
+  const take = confirm(
+    'The link carries room and display settings that differ from this page:\n\n'
+    + lines.join('\n')
+    + '\n\nThese settings belong to this page and apply to every condition.\n\n'
+    + 'OK — take the values from the link (all conditions will use them).\n'
+    + 'Cancel — keep the values on this page.');
+  if (take) {
+    const obj = {};
+    diffs.forEach(d => { obj[d.key] = d.to; });
+    envApply(obj);
+    envChanged();
+  }
+  return true;
+}
+
+/** Stimulus file a condition points at, for the second line of its row. */
+function condFile(entry) {
+  const q = entry.url.indexOf('?');
+  return (q < 0 ? entry.url : entry.url.slice(0, q)).split('/').pop() || entry.url;
+}
+
+/**
+ * The link to open for a condition: the stored condition with this page's
+ * shared settings substituted, in one place so that Run and Page cannot diverge.
+ */
+function condURL(entry, autostart) {
+  const q = entry.url.indexOf('?');
+  const base = q < 0 ? entry.url : entry.url.slice(0, q);
+  const p = new URLSearchParams(q < 0 ? '' : entry.url.slice(q + 1));
+  substituteShared(p, condFile(entry));
+  LAUNCH_KEYS.forEach(k => p.delete(k));
+  if (autostart) p.set('autostart', 'true');
+  /* Run and Page rebuild the href inside their own click handler, after the
+     generic link rewriter has run, so the theme is set here. */
+  p.set('theme', document.documentElement.getAttribute('data-theme') || 'dark');
+  return base + '?' + p.toString();
+}
+
+/**
+ * Take a condition's parameters back from a link edited on a stimulus page.
+ * The shared keys are split off on the way in and offered to this page rather
+ * than stored: stored, they would freeze today's viewing distance and
+ * calibration into the condition, and survive every later change made here.
+ */
+function condUpdateFromLink(i) {
+  const entry = conditions[i];
+  const given = prompt('Paste the link from the stimulus page to update "'
+    + (entry.name || 'this condition') + '":', '');
+  if (given === null) return;
+  const url = given.trim();
+  if (!url) return;
+  const split = stripLink(url);
+  const file = condFile({ url: split.url });
+  if (file !== condFile(entry)
+      && !confirm('That link points at ' + file + ', not '
+                  + condFile(entry) + '. Replace the condition anyway?')) return;
+  offerSharedFromLink(split.shared);
+  conditions[i] = { name: entry.name, url: split.url };
+  protoSave(); renderConditions();
+}
+
+/** One-line summaries in the collapsed section headers, so the values that
+    matter can be checked without opening anything. */
+function updateSummaries() {
+  const v = id => { const e = document.getElementById(id); return e ? String(e.value).trim() : ''; };
+  const sc = document.getElementById('screenSummary');
+  if (sc) {
+    const hz = v('displayRefreshHz');
+    sc.textContent = [(v('screen_width_px') || '?') + ' px', (v('screen_width_cm') || '?') + ' cm',
+                      (v('view_distance_cm') || '?') + ' cm away',
+                      hz ? hz + ' Hz' : null].filter(Boolean).join(' · ');
+  }
+  const sy = document.getElementById('syncSummary');
+  if (sy) {
+    const env = envRead();
+    sy.textContent = v('dot_x') + ',' + v('dot_y') + ' \u00B7 ' + v('dotSize') + ' px \u00B7 '
+                   + v('syncDotFrames') + ' frames \u00B7 '
+                   + SYNC_HEX_KEYS.map(k => env[k]).join(' / ');
+    /* Stimuli sharing a colour cannot be told apart in the recording. */
+    const warn = document.getElementById('syncWarn');
+    if (warn) {
+      const c = SYNC_HEX_KEYS.map(k => env[k]);
+      const dup = [];
+      for (let i = 0; i < c.length; i++)
+        for (let j = i + 1; j < c.length; j++)
+          if (c[i] === c[j]) dup.push((i + 1) + ' and ' + (j + 1));
+      warn.style.display = dup.length ? 'block' : 'none';
+      warn.textContent = dup.length
+        ? '\u26A0 Stimuli ' + dup.join(', ') + ' share a dot color: a multi-stimulus page '
+          + 'will refuse to start, since the recording could not tell them apart.'
+        : '';
+    }
+  }
+}
+
+function renderConditions() {
+  const list = document.getElementById('condList');
+  const empty = document.getElementById('condEmpty');
+  if (!list) return;
+  list.innerHTML = '';
+  document.getElementById('condCount').textContent =
+    conditions.length ? conditions.length + (conditions.length === 1 ? ' condition' : ' conditions') : '';
+  empty.style.display = conditions.length ? 'none' : 'block';
+
+  conditions.forEach((entry, i) => {
+    const row = document.createElement('div');
+    row.className = 'cond-row';
+
+    const name = document.createElement('div');
+    name.className = 'cond-name';
+    const b = document.createElement('b');   b.textContent = entry.name || '(unnamed)';
+    const sm = document.createElement('small'); sm.textContent = condFile(entry);
+    name.appendChild(b); name.appendChild(sm);
+
+    const acts = document.createElement('div');
+    acts.className = 'cond-acts';
+
+    /* Ordinary links rather than window.open: a window opened this way may close
+       itself when the run ends, which is what makes an unattended sequence work. */
+    const run = document.createElement('a');
+    run.className = 'cond-run'; run.textContent = 'Run';
+    run.target = 'vep_run_' + i; run.href = '#';
+    run.addEventListener('click', function () { this.href = condURL(entry, true); });
+
+    const page = document.createElement('a');
+    page.className = 'pill-btn'; page.textContent = 'Page';
+    page.title = 'Open the stimulus page with these settings, to check or edit them';
+    page.target = 'vep_settings_' + condFile(entry).replace(/_vep\.html$/, '');
+    page.href = '#';
+    page.addEventListener('click', function () { this.href = condURL(entry, false); });
+
+    const upd = document.createElement('button');
+    upd.type = 'button'; upd.className = 'pill-btn'; upd.textContent = '↻';
+    upd.title = 'Update this condition from a link edited on the stimulus page';
+    upd.addEventListener('click', () => condUpdateFromLink(i));
+
+    const up = document.createElement('button');
+    up.type = 'button'; up.className = 'pill-btn'; up.textContent = '↑';
+    up.title = 'Move up';
+    up.addEventListener('click', () => condMove(i, -1));
+
+    const del = document.createElement('button');
+    del.type = 'button'; del.className = 'pill-btn danger'; del.textContent = '✕';
+    del.title = 'Remove';
+    del.addEventListener('click', () => {
+      if (confirm('Remove "' + (entry.name || 'this condition') + '" from the protocol?')) {
+        conditions.splice(i, 1); protoSave(); renderConditions();
+      }
+    });
+
+    acts.appendChild(run); acts.appendChild(page);
+    acts.appendChild(upd); acts.appendChild(up); acts.appendChild(del);
+    row.appendChild(name); row.appendChild(acts);
+    list.appendChild(row);
+  });
+}
+
+function condMove(i, d) {
+  const j = i + d;
+  if (j < 0 || j >= conditions.length) return;
+  const t = conditions[i]; conditions[i] = conditions[j]; conditions[j] = t;
+  protoSave(); renderConditions();
+}
+
+function condAdd() {
+  const nameEl = document.getElementById('newCondName');
+  const urlEl  = document.getElementById('newCondUrl');
+  const url = urlEl.value.trim();
+  if (!url) { urlEl.focus(); return; }
+  if (!/_vep\.html/i.test(url)
+      && !confirm('That does not look like a stimulus link. Add it anyway?')) return;
+  const split = stripLink(url);
+  offerSharedFromLink(split.shared);
+  conditions.push({ name: nameEl.value.trim() || condFile({ url: split.url }), url: split.url });
+  nameEl.value = ''; urlEl.value = '';
+  protoSave(); renderConditions();
+}
+
+/* The protocol file carries the room and display settings beside the
+   conditions, so the file alone records how the study was run. They are a
+   record first: loading the file offers them, it does not impose them, because
+   the same protocol is often run on another monitor. */
+function protoExport() {
+  const data = {
+    conditions: conditions,
+    environment: envRead(),
+    exported: new Date().toISOString(),
+    suite_version: (typeof VEP !== 'undefined' && VEP.version) ? VEP.version : null,
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().replace(/\.\d+Z$/, '').replace(/:/g, '-');
+  a.href = url; a.download = 'vep_protocol_' + stamp + '.json'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function protoImport(file) {
+  const msg = document.getElementById('protoMsg');
+  const reader = new FileReader();
+  reader.onload = function (ev) {
+    let data = null;
+    try { data = JSON.parse(ev.target.result); } catch (e) { data = null; }
+    const list = data && Array.isArray(data.conditions) ? data.conditions : null;
+    if (!list) { msg.textContent = 'Not a protocol file.'; msg.style.color = '#e8a55a'; return; }
+    conditions = list.filter(c => c && typeof c.url === 'string')
+                     .map(c => ({ name: String(c.name || ''), url: stripLink(c.url).url }));
+    protoSave(); renderConditions();
+    let note = 'Loaded ' + conditions.length + ' condition(s).';
+    if (data.environment && typeof data.environment === 'object') {
+      const diffs = envDiff(envRead(), data.environment);
+      if (diffs.length) {
+        const take = confirm(
+          'The protocol file also records the room and display settings it was saved with, '
+          + 'and they differ from this page:\n\n'
+          + diffs.map(d => '  ' + ENV_LABEL[d.key] + ': ' + envShow(d.key, d.to)
+                           + ' in the file, ' + envShow(d.key, d.from) + ' here').join('\n')
+          + '\n\nApply them? Only do so on the setup the file was made for.\n\n'
+          + 'OK — apply the settings from the file.\n'
+          + 'Cancel — keep the settings on this page.');
+        if (take) {
+          const obj = {};
+          diffs.forEach(d => { obj[d.key] = d.to; });
+          envApply(obj); envChanged();
+          note += ' Room and display settings applied from the file.';
+        } else {
+          note += ' Room and display settings kept as they were.';
+        }
+      }
+    }
+    msg.textContent = note;
+    msg.style.color = '#59c08b';
+  };
+  reader.readAsText(file);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Settings arriving in this page's own link
+   A stimulus page's "VEP Gate" link hands back the values it was using. They
+   are applied — following that link is a deliberate act — but never silently:
+   the change is listed and can be undone, because the values become the ones
+   every condition is launched with.
+   ══════════════════════════════════════════════════════════════════════════ */
+function showEnvNotice(diffs, previous) {
+  const box = document.getElementById('envNotice');
+  if (!box) return;
+  box.innerHTML = '';
+  const head = document.createElement('div');
+  head.innerHTML = '<strong>Settings taken from the link that opened this page.</strong> '
+    + 'They now apply to every condition:';
+  const ul = document.createElement('ul');
+  ul.style.margin = '.35em 0 .5em'; ul.style.paddingLeft = '1.3em';
+  diffs.forEach(d => {
+    const li = document.createElement('li');
+    li.textContent = ENV_LABEL[d.key] + ': ' + envShow(d.key, d.from) + ' → ' + envShow(d.key, d.to);
+    ul.appendChild(li);
+  });
+  const undo = document.createElement('button');
+  undo.type = 'button'; undo.className = 'pill-btn'; undo.textContent = 'Undo';
+  undo.addEventListener('click', () => {
+    envApply(previous); envChanged(); box.style.display = 'none';
+  });
+  const ok = document.createElement('button');
+  ok.type = 'button'; ok.className = 'pill-btn'; ok.textContent = 'Keep';
+  ok.style.marginLeft = '.5em';
+  ok.addEventListener('click', () => { box.style.display = 'none'; });
+  box.appendChild(head); box.appendChild(ul); box.appendChild(undo); box.appendChild(ok);
+  box.style.display = 'block';
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DOMContentLoaded — wiring
+   ══════════════════════════════════════════════════════════════════════════ */
+window.addEventListener('DOMContentLoaded', () => {
+
+  /* ── Environment: markup defaults, then what this browser remembers, then
+     what the link that opened the page carries. ── */
+
+  /* Auto-detect the screen width, in the same pixels everything else is
+     measured in.
+
+     That unit is the CSS pixel: the canvas is sized from window.innerWidth, all
+     drawing coordinates are canvas pixels, and pixelsPerDegree converts between
+     those and visual angle. window.screen.width reports CSS pixels too, so it is
+     used directly. Multiplying by devicePixelRatio would give the panel's native
+     resolution — a different unit from the one the geometry uses, and on a HiDPI
+     display that makes every angle wrong by the ratio: at dpr 2 a stimulus asked
+     for at 1 c/deg is presented at 0.5, and a mask asked for at 2 deg covers 4.
+
+     The detected value is only a starting point: it describes the screen this
+     page is on, which need not be the one the subject sees. A remembered value
+     wins over it, and the detected one stays visible as the placeholder. */
+  const detectedPx = Math.round(window.screen.width);
+  const pxField = document.getElementById('screen_width_px');
+  pxField.value = detectedPx; pxField.placeholder = detectedPx;
+
+  const stored = envLoad();
+  if (stored) envApply(stored);
+
+  const fromURL = {};
+  ENV_KEYS.forEach(k => { if (urlParams.has(k)) fromURL[k] = urlParams.get(k); });
+  const before = envRead();
+  const urlDiffs = envDiff(before, fromURL);
+  envApply(fromURL);
+
+  /* The session note goes out as 'note' — the name the stimuli and the log use. */
+  if (urlParams.has('note')) {
+    const nf = document.getElementById('noteField');
+    if (nf) nf.value = urlParams.get('note');
+  }
+
+  envSave();
+  /* Only worth reporting when something was set before: on a first visit the
+     link is simply where the values come from. */
+  if (urlDiffs.length && stored) showEnvNotice(urlDiffs, before);
+
+  /* Drop the applied settings from the address, so a reload restores what was
+     remembered (including an Undo) instead of applying the link again. */
+  if (Object.keys(fromURL).length && window.history && history.replaceState) {
+    const rest = new URLSearchParams(window.location.search);
+    ENV_KEYS.forEach(k => rest.delete(k));
+    const qs = rest.toString();
+    try { history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '')
+                                         + window.location.hash); } catch (e) {}
+  }
+
+  /* Any edit of an environment field is remembered and shown at once. The
+     session fields sit outside the form, so listen on the document. */
+  const onEdit = e => {
+    const id = e.target && e.target.id;
+    if (ENV_HEX.has(id)) {
+      const h = normHex(e.target.value);
+      if (!h) {
+        e.target.classList.add('invalid');
+        /* Leaving the field with an unusable code puts the last valid one back. */
+        if (e.type === 'change') {
+          e.target.value = hexLastValid[id]; e.target.classList.remove('invalid');
+        }
+        return;
+      }
+      e.target.classList.remove('invalid');
+      hexLastValid[id] = h; hexShow(id, h);
+      if (e.type === 'change') e.target.value = h;
+      envChanged();
+      return;
+    }
+    if (ENV_KEYS.indexOf(id) >= 0) envChanged();
+    else if (id === 'noteField') updateLinks();
+  };
+  document.addEventListener('input',  onEdit);
+  document.addEventListener('change', onEdit);
+
+  SYNC_HEX_KEYS.forEach(id => {
+    const sw = document.getElementById('swatch_' + id);
+    const hx = document.getElementById(id);
+    if (!sw || !hx) return;
+    sw.title = 'Choose a color';
+    sw.addEventListener('click', () => {
+      const pick = document.createElement('input');
+      pick.type = 'color';
+      pick.value = normHex(hx.value) || hexLastValid[id];
+      const r = sw.getBoundingClientRect();
+      pick.style.cssText = 'position:fixed; left:' + r.left + 'px; top:' + r.bottom + 'px;'
+                         + ' width:1px; height:1px; opacity:0; border:0; padding:0;';
+      document.body.appendChild(pick);
+      const take = () => {
+        hx.value = pick.value;
+        hx.dispatchEvent(new Event('change', { bubbles: true }));
+      };
+      pick.addEventListener('input', take);
+      pick.addEventListener('change', () => { take(); pick.remove(); });
+      pick.addEventListener('blur', () => pick.remove());
+      pick.click();
+    });
+  });
+
+  /* Launch tiles: rebuilt at the moment of the click as well. */
+  document.querySelectorAll('a.launch-btn').forEach(a => a.addEventListener('click', updateLinks));
+
+  /* ── Protocol ── */
+  protoLoad(); renderConditions();
+  document.getElementById('condAddBtn').addEventListener('click', condAdd);
+  document.getElementById('newCondUrl').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); condAdd(); }
+  });
+  document.getElementById('protoExportBtn').addEventListener('click', protoExport);
+  document.getElementById('protoImportInput').addEventListener('change', e => {
+    if (e.target.files && e.target.files[0]) protoImport(e.target.files[0]);
+    e.target.value = '';
+  });
+  document.getElementById('protoClearBtn').addEventListener('click', () => {
+    if (!conditions.length) return;
+    if (confirm('Remove all ' + conditions.length + ' conditions?')) {
+      conditions = []; protoSave(); renderConditions();
+    }
+  });
+
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     Calibration — handles localStorage + file loading + URL parameter passing
+     ══════════════════════════════════════════════════════════════════════════ */
+  const GATE_CAL_KEY  = 'vep_gamma_calibration';
+  /* The file name is kept beside the calibration rather than inside it, so the
+     calibration object stays exactly the format display_calibration.html writes.
+     It carries a fingerprint because that page writes the calibration under the
+     same key: if what is stored no longer matches, the remembered name belongs
+     to something else and is dropped. */
+  const GATE_CAL_SRC_KEY = 'vep_gate_cal_source';
+  const GATE_WARN_DAYS = 30;
+  let gateCalibration = null;   // currently active calibration object
+  let gateCalFileName = '';     // name of the .json it came from, when known
+
+  /* Shared with the stimuli via vep_engine.js — one definition of the 'cal'
+     parameter's encoding, so a link built here always decodes there. */
+  const gEncodeCalForURL  = VEP.encodeCalForURL;
+  const gDecodeCalFromURL = VEP.decodeCalFromURL;
+
+  /** Identity of a calibration, for checking a remembered file name still fits. */
+  function gateCalFingerprint(cal) {
+    return cal ? (cal.model || '') + '|' + (cal.calibration_date || '') : '';
+  }
+
+  function gateRememberCal(cal, name) {
+    try { localStorage.setItem(GATE_CAL_KEY, JSON.stringify(cal)); } catch (e) {}
+    try {
+      localStorage.setItem(GATE_CAL_SRC_KEY,
+        JSON.stringify({ name: name || '', fingerprint: gateCalFingerprint(cal) }));
+    } catch (e) {}
+  }
+
+  /** Date in one fixed form, matching the stimulus pages. */
+  function gateFormatDate(d) {
+    try {
+      return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch (e) { return d.toDateString(); }
+  }
+
+
+  /* Return colour appropriate for current theme */
+  function gCalColor(dark, light) {
+    return document.documentElement.getAttribute('data-theme') === 'light' ? light : dark;
+  }
+
+  function gateUpdateCalStatus() {
+    const el = document.getElementById('gateCalStatus');
+    if (!el) return;
+    if (!gateCalibration) {
+      el.innerHTML = '⚠ No calibration &mdash; stimuli will assume sRGB and work in '
+        + 'relative units, so no luminance can be reported. '
+        + '<a href="display_calibration.html" target="vep_calibration" style="color:#7bc8e8">Calibrate now &rarr;</a>';
+      el.style.borderColor = 'rgba(232,165,90,.3)';
+      el.style.color = gCalColor('#7a9aaa', '#2a4860');
+      return;
+    }
+    const cal  = gateCalibration;
+    const d    = new Date(cal.calibration_date);
+    const days = Math.floor((Date.now() - d) / 86400000);
+    const ms   = { srgb:'sRGB', power:`Power-law (γ=${cal.gamma})`,
+                   measured:'Measured (photometer)' }[cal.model] || cal.model;
+    const Ls   = cal.L_max_cdm2 ? ` · L_max = ${cal.L_max_cdm2} cd/m²` : '';
+    const ns   = cal.monitor_note ? ` · ${cal.monitor_note}` : '';
+    /* Same two states the stimulus pages show, from the same rule: a
+       calibration is "from file" whenever a file name is known for it. */
+    const src  = gateCalFileName ? ` · file: ${gateCalFileName}`
+                                 : ' · temporary (from link)';
+    if (days >= GATE_WARN_DAYS) {
+      el.innerHTML = `⚠ Calibration is <strong>${days} days old</strong> &mdash; consider recalibrating. `
+        + `${ms}${Ls}${ns} · ${gateFormatDate(d)}${src}`;
+      el.style.borderColor = 'rgba(232,165,90,.4)';
+      el.style.color = gCalColor('#e8a55a', '#7a4200');
+    } else {
+      el.innerHTML = `✓ ${ms}${Ls}${ns} · ${gateFormatDate(d)}${src} &mdash; ${days} day${days===1?'':'s'} ago`;
+      el.style.borderColor = 'rgba(89,192,139,.3)';
+      el.style.color = gCalColor('#8dcfa8', '#186040');
+    }
+  }
+  /* The theme toggle lives outside this handler and has to reach it to
+     recolour the status line. */
+  window.__gateUpdateCalStatus = gateUpdateCalStatus;
+
+  function gateLoadCalibrationFromObject(cal, sourceLabel, fileName) {
+    gateCalibration = cal;
+    gateCalFileName = fileName || '';
+    // Mirror to localStorage so a later reload of this page still finds it
+    gateRememberCal(cal, gateCalFileName);
+    gateUpdateCalStatus();
+    const msg = document.getElementById('calFileMsg');
+    if (msg && sourceLabel) {
+      msg.textContent = sourceLabel;
+      msg.style.color = '#59c08b';
+    }
+    updateLinks();   // rebuild stimulus URLs to include cal=
+  }
+
+  function gateLoadCalibrationFromFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function (ev) {
+      try {
+        const cal = JSON.parse(ev.target.result);
+        if (!cal || typeof cal !== 'object' || !cal.model) {
+          throw new Error('not a calibration file');
+        }
+        gateLoadCalibrationFromObject(cal, 'Calibration loaded.', file.name);
+      } catch (e) {
+        const msg = document.getElementById('calFileMsg');
+        if (msg) {
+          msg.textContent = 'Invalid calibration file: ' + e.message;
+          msg.style.color = '#e8a55a';
+        }
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  // Initial load: URL parameter > localStorage
+  (function initCal() {
+    // 1. URL parameter (e.g. arrived at gate from calibration page with ?cal=...)
+    const urlCalStr = urlParams.get('cal');
+    if (urlCalStr) {
+      const cal = gDecodeCalFromURL(urlCalStr);
+      if (cal) {
+        gateCalibration = cal;
+        gateCalFileName = urlParams.get('cal_name') || '';
+        gateRememberCal(cal, gateCalFileName);
+      }
+    }
+    // 2. localStorage fallback — same page, same origin, so this survives even
+    //    under file://; only sharing between different files does not.
+    if (!gateCalibration) {
+      try {
+        const s = localStorage.getItem(GATE_CAL_KEY);
+        if (s) gateCalibration = JSON.parse(s);
+      } catch (e) {}
+      /* Take the remembered name only if it still describes what was stored:
+         display_calibration.html writes the same key and would otherwise leave
+         the previous file's name attached to a different calibration. */
+      if (gateCalibration) {
+        try {
+          const meta = JSON.parse(localStorage.getItem(GATE_CAL_SRC_KEY) || 'null');
+          if (meta && meta.fingerprint === gateCalFingerprint(gateCalibration)) {
+            gateCalFileName = meta.name || '';
+          }
+        } catch (e) {}
+      }
+    }
+    gateUpdateCalStatus();
+  })();
+
+  // Wire file input
+  const calInput = document.getElementById('calLoadInput');
+  if (calInput) {
+    calInput.addEventListener('change', function (ev) {
+      if (ev.target.files && ev.target.files[0]) {
+        gateLoadCalibrationFromFile(ev.target.files[0]);
+      }
+    });
+  }
+  // Expose for substituteShared to use
+  window.__gateGetCalParam = function () {
+    return gateCalibration ? gEncodeCalForURL(gateCalibration) : '';
+  };
+  window.__gateGetCalName = function () {
+    return gateCalibration ? gateCalFileName : '';
+  };
+
+  /* Everything is in place: show it. Last, so the summaries and the tiles
+     describe the values actually in force, not the markup defaults. */
+  updateSummaries();
+  updateLinks();
+});
+
+/* ── Light / dark theme toggle ── */
+(function () {
+  var KEY  = 'vep_theme';
+  var SUN  = '☀';  // ☀  shown in dark mode (click to go light)
+  var MOON = '◗';  // ◗  shown in light mode (click to go dark)
+
+  function applyTheme(t) {
+    document.documentElement.setAttribute('data-theme', t || 'dark');
+    var btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.textContent = (t === 'light') ? MOON : SUN;
+    // Re-render JS-coloured elements with theme-appropriate values
+    if (typeof window.__gateUpdateCalStatus === 'function') window.__gateUpdateCalStatus();
+  }
+
+  /* The bootstrap in <head> has already resolved the theme; follow it rather
+     than reading the store again, which would undo a theme passed in the URL. */
+  applyTheme(document.documentElement.getAttribute('data-theme') || 'dark');
+
+  document.addEventListener('DOMContentLoaded', function () {
+    applyTheme(document.documentElement.getAttribute('data-theme') || 'dark');
+    var btn = document.getElementById('themeToggleBtn');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+        try { localStorage.setItem(KEY, next); } catch (e) {}
+        applyTheme(next);
+      });
+    }
+
+    /* Hand the theme to the next page of the suite. The href is rewritten on
+       the way out, so links the page rebuilds at runtime are covered too. */
+    document.addEventListener('click', function (e) {
+      var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+      if (!a) return;
+      var href = a.getAttribute('href') || '';
+      if (!href || href.charAt(0) === '#') return;
+      var u;
+      try { u = new URL(a.href, location.href); } catch (err) { return; }
+      if (u.protocol !== location.protocol || !/\.html$/i.test(u.pathname)) return;
+      u.searchParams.set('theme', document.documentElement.getAttribute('data-theme') || 'dark');
+      a.href = u.toString();
+    }, true);
+  });
+})();
+
+</script>
+
+</body>
+</html>

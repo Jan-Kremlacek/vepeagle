@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en" class="page-parity">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VEPeagle — WebGL / Canvas2D parity test</title>
+<script>(function(){
+    /* Theme, in order of precedence: the ?theme= parameter another page of the
+       suite passed on, the choice stored here, the system preference. Over
+       file:// the store is per-page, so the parameter is the only way across. */
+    var q = new URLSearchParams(location.search).get('theme');
+    var t = (q === 'light' || q === 'dark') ? q : null;
+    try { t = t || localStorage.getItem('vep_theme'); } catch (e) {}
+    if (!t && window.matchMedia)
+      t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', t || 'dark');
+    if (q === 'light' || q === 'dark') { try { localStorage.setItem('vep_theme', q); } catch (e) {} }
+  })()</script>
+<link rel="stylesheet" href="vep.css">
+</head>
+<body>
+<button id="themeToggleBtn" class="theme-toggle-btn" title="Switch light/dark theme" aria-label="Toggle light/dark theme">&#9728;</button>
+  <h1>WebGL / Canvas2D parity test</h1>
+  <p>
+    Each stimulus can render either on the CPU (Canvas 2D) or on the GPU (WebGL 2).
+    This test opens each stimulus in <code>?parity=1</code> mode: it renders one
+    representative frame <em>both</em> ways and compares them pixel-by-pixel.
+    A <span class="pass">PASS</span> means the GPU output matches the CPU reference
+    within tolerance. A <span class="fail">FAIL</span> means the shader diverges for
+    that configuration, and the stimulus will fall back to Canvas 2D rather than
+    present a pattern it cannot vouch for.
+  </p>
+  <p>
+    <strong>Status:</strong> stimuli render on <strong>WebGL 2 by default</strong>, falling
+    back to Canvas 2D on their own if the parity gate fails at session start. To force the
+    CPU path for a recording, add <code>&amp;webgl=0</code> to a stimulus URL. This page runs
+    the comparison on demand, so you can confirm a shader matches before you rely on it —
+    and the renderer actually used is written into every log under <code>renderer</code>.
+  </p>
+  <p>
+    <strong>Test at your real recording settings.</strong> Parity depends on pattern
+    geometry, screen size and gamma. Put the exact query string you use for recording
+    into the box below (e.g. <code>patternType=checker&amp;screen_width_px=1920&amp;…</code>)
+    and run each pattern type you use. The value <code>maxDiff</code> is the largest
+    per-channel 8-bit difference; <code>pctOver</code> is the percentage of pixels above
+    tolerance (default tolerance = 2 LSB).
+  </p>
+
+  <div class="params">
+    <label>Extra parameters (optional):
+      <input id="extra" placeholder="patternType=checker&screen_width_px=1920&view_distance_cm=70">
+    </label>
+  </div>
+
+  <div class="row">
+    <button class="primary" data-stim="flash_vep.html">Test flash</button>
+    <button class="primary" data-stim="pattern_onset_vep.html">Test pattern&nbsp;onset</button>
+    <button class="primary" data-stim="pattern_reversal_vep.html">Test pattern&nbsp;reversal</button>
+    <button class="primary" data-stim="motion_onset_vep.html">Test motion&nbsp;onset</button>
+    <button class="primary" data-stim="oddball_vep.html">Test oddball</button>
+    <button id="clearBtn">Clear results</button>
+  </div>
+
+  <table id="results">
+    <thead>
+      <tr><th>Stimulus</th><th>Pattern</th><th>Result</th><th>maxDiff</th><th>pctOver</th><th>pixels</th><th>note</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <p><small>Popups must be allowed for this page. Each test opens the stimulus window,
+     runs the check after it loads, then reports back here. You can close the popup once
+     its banner shows.</small></p>
+
+<script>
+  const tbody = document.querySelector('#results tbody');
+
+  function addRow(rep) {
+    const tr = document.createElement('tr');
+    const pass = !!rep.passed;
+    tr.innerHTML =
+      '<td>' + (rep.stimulus || '?') + '</td>' +
+      '<td>' + (rep.pattern  || '—') + '</td>' +
+      '<td class="' + (pass ? 'pass">PASS' : 'fail">FAIL') + '</td>' +
+      '<td>' + (rep.maxDiff != null ? rep.maxDiff : '—') + '</td>' +
+      '<td>' + (rep.pctOver != null ? rep.pctOver + '%' : '—') + '</td>' +
+      '<td>' + (rep.pixels  != null ? rep.pixels.toLocaleString() : '—') + '</td>' +
+      '<td><small>' + (rep.reason || (pass ? 'WebGL usable' : 'falls back to Canvas 2D')) + '</small></td>';
+    tbody.appendChild(tr);
+  }
+
+  function launch(stim) {
+    const extra = document.getElementById('extra').value.trim().replace(/^[?&]/, '');
+    const url = stim + '?parity=1' + (extra ? '&' + extra : '');
+    const w = window.open(url, 'vep_parity_' + stim, 'width=900,height=650');
+    if (!w) alert('Popup blocked — allow popups for this page and try again.');
+  }
+
+  document.querySelectorAll('button[data-stim]').forEach(function (b) {
+    b.addEventListener('click', function () { launch(b.getAttribute('data-stim')); });
+  });
+  document.getElementById('clearBtn').addEventListener('click', function () { tbody.innerHTML = ''; });
+
+  window.addEventListener('message', function (e) {
+    const d = e.data;
+    if (d && d.type === 'vep_parity' && d.report) addRow(d.report);
+  });
+</script>
+
+<script>
+(function () {
+  var KEY  = 'vep_theme';
+  var SUN  = '\u2600';   /* shown in dark mode (click to go light) */
+  var MOON = '\u25D7';   /* shown in light mode (click to go dark) */
+  function applyTheme(t) {
+    document.documentElement.setAttribute('data-theme', t || 'dark');
+    var btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.textContent = (t === 'light') ? MOON : SUN;
+  }
+  /* The bootstrap in <head> has already resolved the theme; follow it rather
+     than reading the store again, which would undo a theme passed in the URL. */
+  applyTheme(document.documentElement.getAttribute('data-theme') || 'dark');
+  document.addEventListener('DOMContentLoaded', function () {
+    applyTheme(document.documentElement.getAttribute('data-theme') || 'dark');
+    var btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.addEventListener('click', function () {
+      var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      try { localStorage.setItem(KEY, next); } catch (e) {}
+      applyTheme(next);
+    });
+
+    /* Hand the theme to the next page of the suite. The href is rewritten on
+       the way out, so links the page rebuilds at runtime are covered too. */
+    document.addEventListener('click', function (e) {
+      var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+      if (!a) return;
+      var href = a.getAttribute('href') || '';
+      if (!href || href.charAt(0) === '#') return;
+      var u;
+      try { u = new URL(a.href, location.href); } catch (err) { return; }
+      if (u.protocol !== location.protocol || !/\.html$/i.test(u.pathname)) return;
+      u.searchParams.set('theme', document.documentElement.getAttribute('data-theme') || 'dark');
+      a.href = u.toString();
+    }, true);
+  });
+})();
+</script>
+</body>
+</html>

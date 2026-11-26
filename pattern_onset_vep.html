@@ -1,0 +1,3378 @@
+<!DOCTYPE html>
+<!--
+  Pattern-Onset VEP Stimulus
+  ===========================
+  Author : Jan Kremlacek
+  Version: 1.2.0
+  License: MIT
+
+  Description
+  -----------
+  Fullscreen pattern-onset VEP stimulus supporting two patterns:
+
+  1. Radial sinusoidal grating with CMF-weighted spatial frequency profile.
+     Spatial frequency f(r) follows a cortical magnification factor (CMF) profile
+     from centre (cent_freq) to periphery (per_freq), matching cortical
+     representation (Kremláček et al., 2004).
+
+  2. Checkerboard: square checks arranged so that the four quadrant corners
+     meet exactly at the screen centre. Check size is set in degrees of visual
+     angle.
+
+  Onset mechanism
+  ----------------
+  Each trial consists of an ON phase (pattern visible for onDuration ms) followed
+  by an OFF phase (uniform blank screen for offDuration ms). The blank colour is
+  configurable and defaults to mid-grey (#808080). The pattern itself is static
+  throughout; no spatial motion or reversal occurs. The fixation cross (when
+  enabled) is always visible, including during the OFF phase.
+
+  Sync dot
+  ---------
+  White square flash at a configurable corner, fired at pattern onset (ON start).
+  An optional second flash can be fired at pattern offset (OFF start).
+
+  Timing
+  -------
+  ON phase: onDuration ms (pattern visible)
+  OFF phase: offDuration ms (blank screen)
+  Repeated for nCycles trials. An optional startDelay (ms) precedes trial 1
+  with the blank screen displayed.
+
+  GET parameters (all optional)
+  --------------------------------
+  patternType, cent_freq, per_freq, checkSize,
+  onDuration, offDuration, nCycles, startDelay,
+  screen_width_px, screen_width_cm, view_distance_cm,
+  useFullscreen, dot_x, dot_y, syncDotFrames, dot_size: dotSize, colour, syncOnOnset, syncOnOffset,
+  showFixation, fixationRadius, fixationThickness,
+  maskCentral, maskCentralRad, maskPeripheral, maskPeripheralRad,
+  maskQ1..4, maskQ1..4Rad, enableLogging, note
+-->
+<html lang="en" class="page-onset">
+<head>
+  <meta charset="UTF-8" />
+  <script>(function(){
+    /* Theme, in order of precedence: the ?theme= parameter another page of the
+       suite passed on, the choice stored here, the system preference. Over
+       file:// the store is per-page, so the parameter is the only way across. */
+    var q = new URLSearchParams(location.search).get('theme');
+    var t = (q === 'light' || q === 'dark') ? q : null;
+    try { t = t || localStorage.getItem('vep_theme'); } catch (e) {}
+    if (!t && window.matchMedia)
+      t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', t || 'dark');
+    if (q === 'light' || q === 'dark') { try { localStorage.setItem('vep_theme', q); } catch (e) {} }
+  })()</script>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiBmaWxsPSIjMWMxYzFjIi8+CiAgPHJlY3QgeD0iMTYiIHk9IjAiICB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjZmZmIi8+CiAgPHJlY3QgeD0iMjQiIHk9IjAiICB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjMWMxYzFjIi8+CiAgPHJlY3QgeD0iMTYiIHk9IjgiICB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjMWMxYzFjIi8+CiAgPHJlY3QgeD0iMjQiIHk9IjgiICB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjZmZmIi8+CiAgPHJlY3QgeD0iMTYiIHk9IjE2IiB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjZmZmIi8+CiAgPHJlY3QgeD0iMjQiIHk9IjE2IiB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjMWMxYzFjIi8+CiAgPHJlY3QgeD0iMTYiIHk9IjI0IiB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjMWMxYzFjIi8+CiAgPHJlY3QgeD0iMjQiIHk9IjI0IiB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjZmZmIi8+CiAgPGxpbmUgeDE9IjE2IiB5MT0iMSIgeDI9IjE2IiB5Mj0iMzEiIHN0cm9rZT0iIzU1NSIgc3Ryb2tlLXdpZHRoPSIxIi8+CiAgPHBvbHlsaW5lIHBvaW50cz0iMTEsMTMgMTUsMTYgMTEsMTkiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzg4OCIgc3Ryb2tlLXdpZHRoPSIxLjgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8L3N2Zz4=">
+  <title>Pattern-Onset VEP Stimulus</title>
+  <!-- p5.js 1.9.3, LGPL-2.1, bundled so the suite runs without a network.
+       See THIRD_PARTY.md and p5.js-LICENSE.txt. -->
+  <script src="p5.min.js"></script>
+<script src="vep_engine.js"></script>
+<script src="vep_page.js"></script>
+<script>
+/* Without the engine a stimulus page cannot do anything: run control, the
+   window protocol, pattern rendering and the whole luminance model live there.
+   Failing on the first VEP.* reference would leave a page that looks like it is
+   loading and never says why, so say it plainly and stop. */
+if (typeof VEP === 'undefined' || !VEP.version) {
+  document.addEventListener('DOMContentLoaded', function () {
+    document.documentElement.classList.remove('vep-child');
+    document.body.innerHTML =
+      '<div style="position:fixed; inset:0; display:flex; flex-direction:column;'
+      + 'align-items:center; justify-content:center; gap:1rem; padding:2rem; text-align:center;'
+      + 'background:#0f141b; color:#e8a55a;'
+      + 'font:16px/1.6 system-ui,-apple-system,sans-serif;">'
+      + '<div style="font-size:1.3rem; font-weight:600;">&#9888; vep_engine.js could not be loaded</div>'
+      + '<div style="max-width:34rem; color:#e6ecf4;">This page needs <code>vep_engine.js</code> '
+      + 'in the same folder. Copy it there and reload \u2014 no stimulus can be presented '
+      + 'without it.</div></div>';
+  });
+  throw new Error('vep_engine.js not loaded');
+}
+</script>
+<script>
+/* p5.min.js and vep_page.js sit beside this page. If either did not load, the
+   page still renders and its settings still read correctly, but nothing can
+   run: an unguarded Start does nothing or hangs at 'Starting...' with an
+   uncaught ReferenceError, and explains nothing. Name the missing file and
+   withhold Start. This check is a listener of its own, registered here in
+   <head>, because the code that would otherwise report it lives in the very
+   files that may be missing, and a page that builds its run controls inside
+   p5's setup() never reaches _refreshRunControls() at all. */
+document.addEventListener('DOMContentLoaded', function () {
+  const missing = [];
+  if (typeof p5 === 'undefined') missing.push('p5.min.js');
+  if (typeof _refreshRunControls !== 'function') missing.push('vep_page.js');
+  if (!missing.length) return;
+  const msg = (missing.length === 1 ? missing[0] + ' did not load'
+                                    : missing.join(' and ') + ' did not load')
+    + ', so no stimulus can run. This page needs '
+    + (missing.length === 1 ? 'it' : 'them') + ' in the same folder; copy '
+    + (missing.length === 1 ? 'it' : 'them') + ' there and reload.';
+  const btn = document.getElementById('runStartBtn');
+  const st  = document.getElementById('runStatus');
+  if (btn) { btn.disabled = true; btn.title = msg; }
+  if (st) { st.textContent = msg; st.classList.add('warn'); }
+});
+</script>
+  <link rel="stylesheet" href="vep.css">
+  <script>
+    /* The presentation window is named per stimulus (vep_present_<stimulus>), so
+       recognise the family rather than one literal name — this runs before the
+       engine loads and cannot ask it. */
+    if (window.opener && /^vep_present_/.test(window.name))
+      document.documentElement.classList.add('vep-child');
+    /* Autostart presents in this very window, so the settings have to be out of
+       the way before anything is painted — the confirmation screen replaces
+       them. Kept here with the other early test so the two cannot drift apart. */
+    if (/[?&]autostart=(1|true|yes|on)(?:&|$)/i.test(window.location.search))
+      document.documentElement.classList.add('vep-child');
+  </script>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════
+     Setup overlay
+     ══════════════════════════════════════════════════════ -->
+<div id="overlay">
+<div id="overlayInner">
+<div id="bgWarn" style="display:none; margin:.5em 0 .9em; padding:.65em .95em; border-radius:.42em; border:1px solid rgba(232,165,90,.5); background:rgba(232,165,90,.1); color:#b06010; font-size:.9em; white-space:pre-line; line-height:1.5;"></div>
+<button id="themeToggleBtn" class="theme-toggle-btn" title="Switch light/dark theme" aria-label="Toggle light/dark theme">&#9728;</button>
+
+
+  <h2>Pattern-Onset VEP Stimulus</h2>
+  <div class="page-subtitle">Radial sinusoidal · Checkerboard</div>
+
+  <!-- ══ RUN CONTROLS (Start / Pause / Stop + status) ══ -->
+  <div class="run-panel">
+    <div class="run-buttons">
+      <button id="runStartBtn" type="button">Start</button>
+      <button id="runPauseBtn" type="button" class="secondary" disabled>Pause</button>
+      <button id="runStopBtn"  type="button" class="secondary" disabled>Stop</button>
+      <span class="spacer"></span>
+      <label class="inline" style="font-size:.88em;"
+             title="Present fullscreen. The stimulus window has to enter fullscreen itself — click it or press F.">
+        <input id="useFullscreen" type="checkbox">
+        Fullscreen
+      </label>
+      <button id="openWindowBtn" type="button" class="secondary" title="Open stimulus in a separate window">↗ New window</button>
+      <button id="exitFsBtn" type="button" class="secondary" style="display:none;" onclick="document.exitFullscreen()">Exit fullscreen</button>
+    </div>
+    <div id="runStatus" class="run-status">Ready.</div>
+    <div class="log-row">
+      <label class="inline" style="font-size:.9em;">
+        <input id="enableLogging" type="checkbox">
+        Save log
+      </label>
+      <input id="noteField" type="text" placeholder="Session note (subject code / condition)…"
+             title="Saved into the log; only used when Save log is checked">
+    </div>
+  </div>
+
+  <form id="paramForm" onsubmit="return false;" autocomplete="off">
+
+    <!-- ══ SCREEN ══ -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">Screen</div>
+      </div>
+      <div id="screenScopeNote" style="
+        display:none; margin:0 0 .7em; padding:.45em .7em; font-size:.8em; line-height:1.5;
+        border-radius:.4em; border:1px solid rgba(232,165,90,.4);
+        background:rgba(232,165,90,.08); color:#e8a55a;
+      "></div>
+      <div id="refreshMismatchNote" style="
+        display:none; margin:0 0 .7em; padding:.45em .7em; font-size:.8em; line-height:1.5;
+        border-radius:.4em; border:1px solid rgba(232,165,90,.4);
+        background:rgba(232,165,90,.08); color:#e8a55a;
+      "></div>
+      <div class="field-grid cols-3">
+        <div>
+          <label>Width (px) <span style="opacity:.45; font-size:.88em;">auto</span></label>
+          <input id="screen_width_px" type="number" min="240" max="30000" step="1" required>
+        </div>
+        <div>
+          <label>Width (cm)</label>
+          <input min="0.1" max="500" id="screen_width_cm" type="number" step="any" value="53" required>
+        </div>
+        <div>
+          <label>View distance (cm)</label>
+          <input min="10" max="1000" id="view_distance_cm" type="number" step="any" value="57" required>
+        </div>
+        <div>
+          <label>Display refresh (Hz) <span style="opacity:.45; font-size:.88em;">optional</span></label>
+          <input id="displayRefreshHz" type="number" step="1" min="1" max="1000" placeholder="e.g. 60"
+                 title="What the operating system reports for the display the subject sees. No browser API exposes it, so it can only be entered by hand.">
+        </div>
+      </div>
+      <div style="margin-top:.7em">
+        <label>Gamma calibration</label>
+        <div id="calibrationStatus" style="
+          padding:.32em .55em; border-radius:.4em;
+          border:1px solid rgba(255,255,255,.1);
+          background:rgba(0,0,0,.25); font-size:.9em; line-height:1.55;
+        ">Loading&hellip;</div>
+        <div style="margin-top:.55em; display:flex; gap:.6em; align-items:center; flex-wrap:wrap;">
+          <label for="calLoadInput" style="
+            display:inline-block; padding:.32em .85em; font-size:.82em;
+            border-radius:1.2em; border:1px solid rgba(123,200,232,.3);
+            background:rgba(0,0,0,.3); color:#7bc8e8; cursor:pointer; margin:0;">
+            Load calibration .json file&hellip;
+          </label>
+          <input id="calLoadInput" type="file" accept=".json,application/json"
+            style="display:none">
+          <span class="t-faint" style="font-size:.78em" id="calFileMsg" ></span>
+        </div>
+      </div>
+      <div id="rendererNote" style="margin-top:.6em; font-size:.78em; color:var(--text-mute);">Renderer: detecting…</div>
+    </div>
+
+    <!-- ══ PATTERN ══ -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">Pattern</div>
+        <div style="display:flex; gap:.7em; align-items:center;">
+          <div class="colour-pair">
+            <span>Light</span>
+            <span class="swatch" id="swatchLight" title="Light color" style="background:#ffffff;"></span>
+            <input class="hex-input" id="hexLight" type="text" maxlength="7" value="#ffffff">
+          </div>
+          <div class="colour-pair">
+            <span>Dark</span>
+            <span class="swatch" id="swatchDark" title="Dark color" style="background:#000000;"></span>
+            <input class="hex-input" id="hexDark" type="text" maxlength="7" value="#000000">
+          </div>
+          <div class="colour-pair">
+            <span>Blank</span>
+            <span class="swatch" id="swatchBlank" title="Blank screen color" style="background:#808080;"></span>
+            <input class="hex-input" id="hexBlank" type="text" maxlength="7" value="#808080">
+          </div>
+        </div>
+      </div>
+      <div class="field-grid cols-3">
+        <div>
+          <label>Contrast (%) <span style="opacity:.45; font-size:.88em;">Michelson, pattern only</span></label>
+          <input id="targetContrast" type="number" step="any" min="0" max="100" value="100">
+        </div>
+        <div>
+          <label>Mean luminance <span id="meanLumUnit" style="opacity:.45; font-size:.88em;">relative</span></label>
+          <input id="targetMeanLum" type="number" step="any" min="0">
+        </div>
+        <div style="display:flex; align-items:flex-end; gap:.7em; flex-wrap:wrap;">
+          <button type="button" class="secondary" id="applyContrastBtn">Apply to colors</button>
+          <label style="display:flex; align-items:center; gap:.35em; font-size:.8em; margin:0;">
+            <input type="checkbox" id="blankFollowsMean" checked>
+            Blank at pattern mean
+          </label>
+        </div>
+      </div>
+      <div id="contrastReadout" style="margin-top:.55em; margin-bottom:.75em; font-size:.8em; color:var(--text-mute); line-height:1.5;"></div>
+
+      <!-- Pattern type radio pills -->
+      <div style="margin-bottom:.75em;">
+        <label style="margin-bottom:.3em;">Pattern type</label>
+        <div class="radio-pill-group">
+          <input type="radio" name="patternType" id="patternRadial" value="radial">
+          <label for="patternRadial">Radial sinusoidal</label>
+          <input type="radio" name="patternType" id="patternChecker" value="checker" checked>
+          <label for="patternChecker">Checkerboard</label>
+        </div>
+      </div>
+
+      <!-- Radial-only parameters -->
+      <div class="field-grid radial-only hidden" id="radialParams">
+        <div>
+          <label>Central freq (c/deg)</label>
+          <input min="0.01" max="60" id="cent_freq" type="number" step="any" value="1" required>
+        </div>
+        <div>
+          <label>Peripheral freq (c/deg)</label>
+          <input min="0.001" max="60" id="per_freq" type="number" step="any" value="0.05" required>
+        </div>
+      </div>
+
+      <!-- Checker-only parameters -->
+      <div class="field-grid checker-only" id="checkerParams">
+        <div>
+          <label>Check size (deg)</label>
+          <input id="checkSize" type="number" step="any" min="0.01" max="45" value="1" required>
+        </div>
+      </div>
+
+      <!-- Alternation option -->
+      <div style="margin-top:.6em;">
+        <label class="inline">
+          <input id="alternatePattern" type="checkbox" checked>
+          Alternate phase on every other trial (anti-adaptation)
+        </label>
+        <div class="t-faint" style="font-size:.78em; margin-top:.25em; padding-left:1.6em; line-height:1.45" >
+          Odd trials show the pattern; even trials show it phase-inverted (light↔dark swapped).
+          Prevents long-term luminance adaptation without changing the temporal structure.
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ TIMING ══ -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">Timing</div>
+      </div>
+      <div class="field-grid cols-3">
+        <div>
+          <label>Trials</label>
+          <input id="nCycles" type="number" step="1" min="1" max="10000" value="100" required>
+        </div>
+        <div>
+          <label>On duration (ms)</label>
+          <input id="onDuration" type="number" step="1" min="1" max="600000" value="200" required>
+        </div>
+        <div>
+          <label>Off duration (ms)</label>
+          <input id="offDuration" type="number" step="1" min="1" max="600000" value="400" required>
+        </div>
+        <div>
+          <label>Start delay (ms)</label>
+          <input id="startDelay" type="number" step="1" min="0" max="600000" value="3000" required>
+        </div>
+        <div class="span-all">
+          <label>Frame delivery rate <span style="opacity:.45; font-size:.88em;">measured</span></label>
+          <div id="fpsDisplay" style="
+            padding: .32em .5em; border-radius: .4em;
+            border: 1px solid rgba(255,255,255,.1);
+            background: rgba(0,0,0,.25); color: #7bc8e8;
+            font-size: .93em; font-family: monospace; letter-spacing: .04em;
+          ">— (measured at session start)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ SYNCHRONISATION ══ -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">Synchronization</div>
+        <div style="display:flex; gap:.7em; align-items:center;">
+          <div class="colour-pair" title="Color of the sync dot when it fires. Between triggers the dot is black. White suits a luminance photodiode; a single primary (#ff0000, #00ff00, #0000ff) suits an RGB photodiode.">
+            <span>Dot</span>
+            <span class="swatch" id="swatchSync1" title="Sync dot color" style="background:#ffffff;"></span>
+            <input class="hex-input" id="hexSync1" type="text" maxlength="7" value="#ffffff">
+          </div>
+        </div>
+      </div>
+      <div class="field-grid cols-4">
+        <div>
+          <label>Dot X (px)</label>
+          <input id="dot_x" type="number" min="0" max="30000" step="1" value="32">
+        </div>
+        <div>
+          <label>Dot Y (px)</label>
+          <input id="dot_y" type="number" min="0" max="30000" step="1" value="32">
+        </div>
+        <div>
+          <label>Dot size (px)</label>
+          <input id="dotSize" type="number" step="1" min="1" max="2000" value="32">
+        </div>
+        <div>
+          <label>Dot on-time (frames)</label>
+          <input id="syncDotFrames" type="number" step="1" min="1" max="600" value="2">
+        </div>
+        <div></div>
+        <div>
+          <label class="inline">
+            <input id="syncOnOnset" type="checkbox" checked>
+            Flash at pattern onset
+          </label>
+        </div>
+        <div>
+          <label class="inline">
+            <input id="syncOnOffset" type="checkbox">
+            Flash at pattern offset
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ MASKING ══ -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">Masking</div>
+        <div style="display:flex; gap:.7em; align-items:center;">
+          <div class="colour-pair">
+            <span>Fixation</span>
+            <span class="swatch" id="swatchFixation" title="Fixation color" style="background:#ff0000;"></span>
+            <input class="hex-input" id="hexFixation" type="text" maxlength="7" value="#ff0000">
+          </div>
+          <div class="colour-pair">
+            <span>Mask</span>
+            <span class="swatch" id="swatchMask" title="Mask color" style="background:#808080;"></span>
+            <input class="hex-input" id="hexMask" type="text" maxlength="7" value="#808080">
+          </div>
+        </div>
+      </div>
+
+      <div class="sub-title">Fixation cross</div>
+      <div class="field-grid cols-3">
+        <div>
+          <label class="inline">
+            <input id="showFixation" type="checkbox" checked>
+            Show fixation cross
+          </label>
+        </div>
+        <div>
+          <label>Radius (deg)</label>
+          <input id="fixationRadius" type="number" step="any" min="0.01" max="45" value="0.25">
+        </div>
+        <div>
+          <label>Thickness (px)</label>
+          <input id="fixationThickness" type="number" step="1" min="1" max="200" value="2">
+        </div>
+      </div>
+
+      <hr class="inset-divider">
+
+      <div class="sub-title">Circular masks</div>
+      <div class="field-grid cols-3">
+        <div></div>
+        <div><label>Enable</label></div>
+        <div><label>Radius (deg)</label></div>
+
+        <div><label style="padding-top:.35em; color:#dde;">Central</label></div>
+        <div style="padding-top:.3em;">
+          <label class="inline"><input id="maskCentral" type="checkbox"></label>
+        </div>
+        <div>
+          <input id="maskCentralRad" type="number" step="any" min="0" max="90" value="2">
+        </div>
+
+        <div><label style="padding-top:.35em; color:#dde;">Peripheral</label></div>
+        <div style="padding-top:.3em;">
+          <label class="inline"><input id="maskPeripheral" type="checkbox"></label>
+        </div>
+        <div>
+          <input id="maskPeripheralRad" type="number" step="any" min="0" max="90" value="10">
+        </div>
+      </div>
+
+      <hr class="inset-divider">
+
+      <div class="sub-title">Quadrant masks</div>
+      <div class="field-grid cols-4">
+        <div>
+          <label class="inline" style="margin-bottom:.3em;">
+            <input id="maskQ1" type="checkbox"> Top-right
+          </label>
+          <input id="maskQ1Rad" type="number" step="any" min="0" max="90" value="5" placeholder="radius (deg)">
+        </div>
+        <div>
+          <label class="inline" style="margin-bottom:.3em;">
+            <input id="maskQ2" type="checkbox"> Top-left
+          </label>
+          <input id="maskQ2Rad" type="number" step="any" min="0" max="90" value="5" placeholder="radius (deg)">
+        </div>
+        <div>
+          <label class="inline" style="margin-bottom:.3em;">
+            <input id="maskQ3" type="checkbox"> Bottom-left
+          </label>
+          <input id="maskQ3Rad" type="number" step="any" min="0" max="90" value="5" placeholder="radius (deg)">
+        </div>
+        <div>
+          <label class="inline" style="margin-bottom:.3em;">
+            <input id="maskQ4" type="checkbox"> Bottom-right
+          </label>
+          <input id="maskQ4Rad" type="number" step="any" min="0" max="90" value="5" placeholder="radius (deg)">
+        </div>
+      </div>
+    </div>
+
+  </form>
+
+  <!-- Reproducible link + APA-style report -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-title">Reproducible link</div>
+      <span class="section-meta">Click to copy</span>
+    </div>
+    <code id="urlPreview" class="url-block copyable"
+          title="Copy a link to reproduce the current settings">Copy a link to reproduce the current settings</code>
+  </div>
+
+  <div class="section">
+    <div class="section-head">
+      <div class="section-title">APA-style report</div>
+      <span class="section-meta">Click to copy</span>
+    </div>
+    <div id="apaPreview" class="apa-block copyable"
+         title="Copy a stimulus description in APA-like style">Copy a stimulus description in APA-like style</div>
+  </div>
+
+  <!-- Footer -->
+  <div class="t-steel" style="margin-top:1.2em; padding-top:.7em; border-top: 1px solid rgba(255,255,255,.07); display:flex; justify-content:space-between; align-items:center; font-size:.72em; flex-wrap:wrap; gap:.3em" >
+    <span>Pattern-Onset VEP Stimulus &nbsp;&mdash;&nbsp; v1.2.0</span>
+    <span style="display:flex; gap:.9em; flex-wrap:wrap;"><a id="gateBackLink" href="vep_gate.html" target="vep_gate" style="color:#7bc8e8; text-decoration:none;">VEP Gate</a> &middot; <a href="vep_log_analyzer.html" target="vep_analyzer" style="color:#7bc8e8; text-decoration:none;">Log Analyzer</a> &middot; <a href="manual.html#onset" target="vep_manual" style="color:#7bc8e8; text-decoration:none;">Help &amp; documentation</a></span>
+    <span>&copy; 2026 Jan Kremlacek &mdash; MIT License</span>
+  </div>
+
+</div><!-- end overlayInner -->
+</div><!-- end overlay -->
+
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   Helpers
+   ══════════════════════════════════════════════════════════════════════════ */
+const urlParams = new URLSearchParams(window.location.search);
+
+function getPatternType() {
+  const checked = document.querySelector('input[name="patternType"]:checked');
+  return checked ? checked.value : 'checker';
+}
+
+/* ── Colour utilities ── */
+function hsvToRgb(h, s, v) {
+  const f = n => { const k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); };
+  return { r: (f(5) * 255) | 0, g: (f(3) * 255) | 0, b: (f(1) * 255) | 0 };
+}
+
+function hexToRgb(hex) {
+  const h = hex.trim();
+  const m6 = h.match(/^#([0-9a-f]{6})$/i);
+  if (m6) { const n = parseInt(m6[1], 16); return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 }; }
+  const m3 = h.match(/^#([0-9a-f]{3})$/i);
+  if (m3) { const [r, g, b] = m3[1].split('').map(x => parseInt(x+x, 16)); return { r, g, b }; }
+  return null;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Colour picker
+   ══════════════════════════════════════════════════════════════════════════ */
+let pickerTarget = null, pickerSwatch = null;
+let pickerH = 0, pickerS = 0, pickerV = 1;
+
+function drawPickerWheel() {
+  const canvas = document.getElementById('pickerWheel');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height, cx = W / 2, cy = H / 2, R = cx - 2;
+  const img = ctx.createImageData(W, H), d = img.data;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const dx = x - cx, dy = y - cy, dist = Math.hypot(dx, dy);
+      if (dist > R) { d[(y*W+x)*4+3] = 0; continue; }
+      const h = ((Math.atan2(dy, dx) * 180 / Math.PI) + 360) % 360;
+      const { r, g, b } = hsvToRgb(h, dist / R, pickerV);
+      const i = (y * W + x) * 4;
+      d[i] = r; d[i+1] = g; d[i+2] = b; d[i+3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const angle = pickerH * Math.PI / 180;
+  const px = cx + pickerS * R * Math.cos(angle), py = cy + pickerS * R * Math.sin(angle);
+  ctx.strokeStyle = pickerV > 0.5 ? '#000' : '#fff';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2); ctx.stroke();
+}
+function updatePickerPreview() {
+  document.getElementById('pickerPreview').style.background = rgbToHex(hsvToRgb(pickerH, pickerS, pickerV));
+}
+function openPicker(swatchEl, colorObj) {
+  pickerTarget = colorObj; pickerSwatch = swatchEl;
+  const hsv = rgbToHsv(colorObj);
+  pickerH = hsv.h; pickerS = hsv.s; pickerV = hsv.v;
+  document.getElementById('pickerSlider').value = Math.round(pickerV * 100);
+  drawPickerWheel(); updatePickerPreview();
+  const picker = document.getElementById('colorPicker');
+  picker.style.display = 'block';
+  const rect = swatchEl.getBoundingClientRect(), pw = 178, ph = 260;
+  let left = rect.left, top = rect.bottom + 6;
+  if (left + pw > window.innerWidth)  left = window.innerWidth  - pw - 8;
+  if (top  + ph > window.innerHeight) top  = rect.top - ph - 6;
+  picker.style.left = left + 'px'; picker.style.top = top + 'px';
+}
+function closePicker() {
+  const col = hsvToRgb(pickerH, pickerS, pickerV);
+  pickerTarget.r = col.r; pickerTarget.g = col.g; pickerTarget.b = col.b;
+  if (pickerSwatch) {
+    pickerSwatch.style.background = rgbToHex(col);
+    const hexId = pickerSwatch.id.replace('swatch', 'hex');
+    const hexEl = document.getElementById(hexId);
+    if (hexEl) { hexEl.value = rgbToHex(col); hexEl.classList.remove('invalid'); }
+  }
+  document.getElementById('colorPicker').style.display = 'none';
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  /* picker wheel interaction */
+  document.getElementById('pickerWheel').addEventListener('mousedown', function(e) {
+    const moveHS = ev => {
+      const rect = this.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+      const R = rect.width / 2 - 2;
+      pickerH = ((Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180 / Math.PI) + 360) % 360;
+      pickerS = Math.min(Math.hypot(ev.clientX - cx, ev.clientY - cy), R) / R;
+      drawPickerWheel(); updatePickerPreview();
+    };
+    moveHS(e);
+    const up = () => { window.removeEventListener('mousemove', moveHS); window.removeEventListener('mouseup', up); };
+    window.addEventListener('mousemove', moveHS); window.addEventListener('mouseup', up);
+  });
+  document.getElementById('pickerSlider').addEventListener('input', function() {
+    pickerV = this.value / 100; drawPickerWheel(); updatePickerPreview();
+  });
+  document.getElementById('pickerClose').addEventListener('click', closePicker);
+
+  /* swatch + hex wiring */
+  const COLOUR_MAP = [
+    { swatchId: 'swatchLight',    hexId: 'hexLight',    col: colLight },
+    { swatchId: 'swatchDark',     hexId: 'hexDark',     col: colDark },
+    { swatchId: 'swatchBlank',    hexId: 'hexBlank',    col: colBlank },
+    { swatchId: 'swatchFixation', hexId: 'hexFixation', col: colFixation },
+    { swatchId: 'swatchSync1',    hexId: 'hexSync1',    col: colSync },
+    { swatchId: 'swatchMask',     hexId: 'hexMask',     col: colMask },
+  ];
+  COLOUR_MAP.forEach(({ swatchId, hexId, col }) => {
+    const swatchEl = document.getElementById(swatchId);
+    const hexEl    = document.getElementById(hexId);
+    swatchEl.addEventListener('click', () => openPicker(swatchEl, col));
+    const applyHex = () => {
+      const rgb = hexToRgb(hexEl.value);
+      if (!rgb) { hexEl.classList.add('invalid'); return; }
+      hexEl.classList.remove('invalid');
+      col.r = rgb.r; col.g = rgb.g; col.b = rgb.b;
+      swatchEl.style.background = rgbToHex(rgb);
+      hexEl.value = rgbToHex(rgb);
+      try { updateContrastReadout(); } catch (e) {}
+    };
+    hexEl.addEventListener('change', applyHex);
+    hexEl.addEventListener('keydown', e => { if (e.key === 'Enter') applyHex(); });
+    hexEl.addEventListener('input', () => hexEl.classList.toggle('invalid', !hexToRgb(hexEl.value)));
+  });
+
+  document.addEventListener('mousedown', e => {
+    const picker = document.getElementById('colorPicker');
+    if (picker.style.display === 'block' && !picker.contains(e.target) &&
+        !e.target.classList.contains('swatch') && !e.target.classList.contains('hex-input') &&
+        !e.target.classList.contains('colour-pair')) closePicker();
+  });
+
+  /* Auto-detect the screen width, in the same pixels everything else is
+     measured in.
+
+     That unit is the CSS pixel: the canvas is sized from window.innerWidth, all
+     drawing coordinates are canvas pixels, and pixelsPerDegree converts between
+     those and visual angle. window.screen.width reports CSS pixels too, so it is
+     used directly. Multiplying by devicePixelRatio would give the panel's native
+     resolution — a different unit from the one the geometry uses, and on a HiDPI
+     display that makes every angle wrong by the ratio: at dpr 2 a stimulus asked
+     for at 1 c/deg is presented at 0.5, and a mask asked for at 2 deg covers 4. */
+  const detectedPx = Math.round(window.screen.width);
+  const pxField = document.getElementById('screen_width_px');
+  pxField.value = detectedPx; pxField.placeholder = detectedPx;
+
+  /* pattern type toggle */
+  function updatePatternVisibility() {
+    const isRadial = getPatternType() === 'radial';
+    document.getElementById('radialParams').classList.toggle('hidden', !isRadial);
+    document.getElementById('checkerParams').classList.toggle('hidden', isRadial);
+  }
+  document.querySelectorAll('input[name="patternType"]').forEach(r =>
+    r.addEventListener('change', updatePatternVisibility)
+  );
+  updatePatternVisibility();
+
+  /* GET param pre-fill — the map itself lives at module scope. */
+  if (urlParams.has('patternType')) {
+    const r = document.querySelector(`input[name="patternType"][value="${urlParams.get('patternType')}"]`);
+    if (r) r.checked = true;
+  }
+  for (const [key, id] of Object.entries(GET_TO_FIELD_ID)) {
+    if (!urlParams.has(key)) continue;
+    const el = document.getElementById(id);
+    if (!el) continue;
+    if (el.type === 'checkbox') el.checked = paramBool(key, el.checked);
+    else el.value = urlParams.get(key);
+  }
+// Re-apply hex colours: URL params filled the inputs but didn't fire events.
+  // Iterate COLOUR_MAP directly so col objects reflect the URL-supplied values.
+  COLOUR_MAP.forEach(function(entry) {
+    var el = document.getElementById(entry.hexId);
+    if (!el) return;
+    var rgb = hexToRgb(el.value);
+    if (!rgb) return;
+    entry.col.r = rgb.r; entry.col.g = rgb.g; entry.col.b = rgb.b;
+    var sw = document.getElementById(entry.swatchId);
+    if (sw) sw.style.background = el.value;
+  });
+  if (urlParams.has('note')) document.getElementById('noteField').value = urlParams.get('note');
+  updatePatternVisibility();
+
+  /* fullscreen change */
+  /* ── Run controls + child/parent window wiring ── */
+  const _owBtn=document.getElementById('openWindowBtn');
+  if(_owBtn) _owBtn.onclick=function(){ openStandaloneWindow(); setTimeout(_refreshRunControls, 0); };
+  if(_isChild){
+    const ov=document.getElementById('overlay');
+    if(ov) ov.style.display='none';
+    /* The child window presents the stimulus; it has no settings UI, so hide
+       the run panel and drive it entirely from the parent's commands. */
+    const rp=document.querySelector('.run-panel'); if(rp) rp.style.display='none';
+    VEP.showChildWaiting(true);
+    _toParent({type:'vep_ready'});
+    _reportGeometryToParent();
+    _probeChildRefreshRate();
+    _watchScreenChanges();
+    /* Report geometry whenever this window's size or fullscreen state changes,
+       so the parent's Start gate updates the moment the operator maximizes it
+       (green button / own virtual desktop) or toggles fullscreen — not only on
+       p5's windowResized, which may not fire before the first Start. */
+    let _geomTimer = null;
+    const _reportGeomSoon = function () {
+      if (_geomTimer) clearTimeout(_geomTimer);
+      _geomTimer = setTimeout(_reportGeometryToParent, 60);
+    };
+    window.addEventListener('resize', _reportGeomSoon);
+    document.addEventListener('fullscreenchange', _reportGeomSoon);
+    /* Moving the window to another monitor need not change window.screen at all
+       — two displays of the same resolution are indistinguishable that way — so
+       re-measure on everything that accompanies such a move instead of relying
+       on the screen signature alone. */
+    window.addEventListener('resize', _probeChildRefreshRate);
+    document.addEventListener('fullscreenchange', _probeChildRefreshRate);
+    window.addEventListener('focus', _probeChildRefreshRate);
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) _probeChildRefreshRate();
+    });
+    /* Fullscreen affordance is only offered when the operator asked for it.
+       It can also be turned on later, from the parent -- see _applyFullscreenPref. */
+    _applyFullscreenPref(_childFullscreenWanted());
+  } else {
+  }
+  _initRunControls();
+
+  // Keep the "Exit fullscreen" button visible only while in fullscreen. If the
+  // browser leaves fullscreen unexpectedly during a running session (system
+  // dialog, Alt+Tab on some OSes), treat it as an abort — but debounce, because
+  // a transient exit during the transition must not abort.
+  let _fsExitTimer = null;
+  document.addEventListener('fullscreenchange', () => {
+    const inFs = !!document.fullscreenElement;
+    document.getElementById('exitFsBtn').style.display = inFs ? 'inline-block' : 'none';
+    if (_bgSafety && _bgSafety.markFrame) _bgSafety.markFrame();  // transition paused rAF; don't treat as a stall
+    if (inFs) { if (_fsExitTimer) { clearTimeout(_fsExitTimer); _fsExitTimer = null; } return; }
+    if (_fsExitTimer) clearTimeout(_fsExitTimer);
+    _fsExitTimer = setTimeout(() => {
+      _fsExitTimer = null;
+      /* Same ending as Ctrl+Space: the run is over either way, so the log must
+         be written either way. */
+      if (!document.fullscreenElement && state !== 'INIT') abortStimulation(true);
+    }, 400);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   URL builder
+   ══════════════════════════════════════════════════════════════════════════ */
+function updateURLPreview() {
+  const f = id => document.getElementById(id);
+  const p = new URLSearchParams();
+  p.set('patternType',      getPatternType());
+  p.set('cent_freq',        f('cent_freq').value);
+  p.set('per_freq',         f('per_freq').value);
+  p.set('checkSize',        f('checkSize').value);
+  p.set('alternatePattern', f('alternatePattern').checked);
+  p.set('onDuration',       f('onDuration').value);
+  p.set('offDuration',      f('offDuration').value);
+  p.set('nCycles',          f('nCycles').value);
+  p.set('startDelay',       f('startDelay').value);
+  p.set('screen_width_px',  f('screen_width_px').value);
+  p.set('screen_width_cm',  f('screen_width_cm').value);
+  p.set('view_distance_cm', f('view_distance_cm').value);
+  p.set('displayRefreshHz',  f('displayRefreshHz').value);
+  p.set('useFullscreen',    f('useFullscreen').checked);
+  p.set('dot_x',            f('dot_x').value);
+  p.set('dot_y',            f('dot_y').value);
+  p.set('syncDotFrames',    f('syncDotFrames').value);
+  p.set('syncOnOnset',      f('syncOnOnset').checked);
+  p.set('syncOnOffset',     f('syncOnOffset').checked);
+  p.set('showFixation',     f('showFixation').checked);
+  p.set('fixationRadius',   f('fixationRadius').value);
+  p.set('fixationThickness',f('fixationThickness').value);
+  p.set('maskCentral',      f('maskCentral').checked);
+  p.set('maskCentralRad',   f('maskCentralRad').value);
+  p.set('maskPeripheral',   f('maskPeripheral').checked);
+  p.set('maskPeripheralRad',f('maskPeripheralRad').value);
+  p.set('maskQ1',            f('maskQ1').checked);
+  p.set('maskQ1Rad',         f('maskQ1Rad').value);
+  p.set('maskQ2',            f('maskQ2').checked);
+  p.set('maskQ2Rad',         f('maskQ2Rad').value);
+  p.set('maskQ3',            f('maskQ3').checked);
+  p.set('maskQ3Rad',         f('maskQ3Rad').value);
+  p.set('maskQ4',            f('maskQ4').checked);
+  p.set('maskQ4Rad',         f('maskQ4Rad').value);
+  p.set('hexMask',           f('hexMask').value);
+  /* The pattern colours are what define the contrast, and the blank field is part
+     of the onset, so a link without them is not the condition it claims to be. */
+  p.set('hexLight',          f('hexLight').value);
+  p.set('hexDark',           f('hexDark').value);
+  p.set('hexBlank',          f('hexBlank').value);
+  p.set('hexFixation',       f('hexFixation').value);
+  p.set('dotSize',           f('dotSize').value);
+  p.set('hexSync1',           f('hexSync1').value);
+  ['maskQ1','maskQ2','maskQ3','maskQ4'].forEach(id => {
+    p.set(id, f(id).checked); p.set(id+'Rad', f(id+'Rad').value);
+  });
+  p.set('enableLogging', f('enableLogging').checked);
+  const note = f('noteField').value.trim();
+  if (note) p.set('note', note);
+
+  // Propagate the gamma calibration (a URL param, not a form field) to the
+  // standalone/child window so it is calibrated exactly like the main window.
+  const _cal = gEncodeCalForURL(gammaCalibration);
+  if (_cal) p.set('cal', _cal);
+  // Carry the provenance too, so a log written by the stimulus window names the
+  // calibration file rather than reporting the transport it happened to arrive by.
+  if (_cal && gammaCalSource === 'file' && gammaCalFileName) p.set('cal_name', gammaCalFileName);
+
+  const url = window.location.href.split('?')[0] + '?' + p.toString();
+  const el  = document.getElementById('urlPreview');
+  el.textContent = url;
+  return url;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   APA-style stimulus description
+   ══════════════════════════════════════════════════════════════════════════ */
+/* Which renderer will actually be used, for the methods text. During a session
+   `useWebGL` is authoritative; before one runs it is still false, so fall back
+   to the detection result (the same signal that drives the on-screen renderer
+   note) and this file's default gate (WebGL unless ?webgl=0). */
+function _effectiveWebGL() {
+  if (_rendererDecided) {
+    if (_childWin && !_childWin.closed && _childUseWebGL !== null) return _childUseWebGL;
+    return useWebGL;
+  }
+  if (useWebGL) return true;
+  if (urlParams.get('webgl') === '0') return false;
+  return !!(webglTestResult && webglTestResult.passed);
+}
+
+
+function buildAPADescription() {
+  const f  = id => document.getElementById(id);
+  const fv = id => +f(id).value;
+  const fb = id => f(id).checked;
+
+  const pType    = getPatternType();
+  const onDur    = fv('onDuration');
+  const offDur   = fv('offDuration');
+  const nTrials  = fv('nCycles');
+  const startDel = fv('startDelay');
+  const viewDist = fv('view_distance_cm');
+  const scrWpx   = fv('screen_width_px');
+  const scrWcm   = fv('screen_width_cm');
+  const ppd      = +(2 * viewDist * Math.tan(0.5 * Math.PI / 180) / (scrWcm / scrWpx)).toFixed(1);
+  /* The rate of the surface that presents the stimulus — the stimulus window
+     when one is open, which may be another monitor. */
+  const fpsInfo   = presentationFPS();
+  const fps       = fpsInfo.hz > 0 ? fpsInfo.hz : NaN;
+  /* Read from the form, not from the session variables: those are only set when
+     a session starts in this window, so before that — and always when the
+     stimulus runs in a separate window — they would still hold the defaults. */
+  const dotSz     = Math.max(1, Math.round(+document.getElementById('dotSize').value) || 32);
+  /* Read from the form for the same reason as the dot size. */
+  const syncCol   = VEP.syncColourText(hexToRgb(document.getElementById('hexSync1').value) || { r: 255, g: 255, b: 255 });
+  const lightHex = f('hexLight').value;
+  const darkHex  = f('hexDark').value;
+  const blankHex = f('hexBlank').value;
+
+  const totalDur_s   = +((nTrials * (onDur + offDur)) / 1000).toFixed(1);
+
+  const parts = [];
+
+  // ── Pattern ───────────────────────────────────────────────────────────────
+  if (pType === 'checker') {
+    const checkSz   = fv('checkSize');
+    const checkSzPx = Math.round(checkSz * ppd);
+    parts.push(
+      `A pattern-onset visual evoked potential (VEP) stimulus was presented as a ` +
+      `checkerboard. Each check subtended ${checkSz} deg of visual angle ` +
+      `(${checkSzPx} px). The checkerboard was centered so that four checks met at ` +
+      `the center of the display. ` +
+      `Light checks were rendered in ${lightHex} and dark checks in ${darkHex}.`
+    );
+  } else {
+    const cf = fv('cent_freq'), pf = fv('per_freq');
+    parts.push(
+      `A pattern-onset visual evoked potential (VEP) stimulus was presented as a ` +
+      `radial sinusoidal grating with a cortical magnification factor (CMF)-weighted spatial ` +
+      `frequency profile. ` +
+      `Spatial frequency varied from ${cf} c/deg at fixation to ${pf} c/deg in the periphery. ` +
+      `The grating modulated at full amplitude between the two phase colors, ` +
+      `rendered in ${lightHex} and ${darkHex}, so the pattern's contrast is that of ` +
+      `the color pair alone.`
+    );
+  }
+
+  // ── Onset timing ──────────────────────────────────────────────────────────
+  const altOn = fb('alternatePattern');
+  parts.push(
+    `The pattern appeared for ${onDur} ms (ON phase) followed by a uniform blank screen ` +
+    `for ${offDur} ms (OFF phase), repeated for ${nTrials} trial${nTrials !== 1 ? 's' : ''} ` +
+    `(total stimulation time approximately ${Math.round(+totalDur_s)} s). ` +
+    `The blank screen was rendered in ${blankHex}` +
+    (function () {
+      /* Said only when it is true, within 8-bit quantization of the blank. */
+      try {
+        const lum = h => VEP.luminanceOfRGB(gammaFns, hexToRgb(h));
+        const Lm = (lum(lightHex) + lum(darkHex)) / 2, Lb = lum(blankHex);
+        return (Lm > 0 && Math.abs(Lb - Lm) <= 0.02 * Lm)
+          ? ', matched to the mean luminance of the pattern. ' : '. ';
+      } catch (e) { return '. '; }
+    })() +
+    `The pattern was static during each ON phase; no spatial motion or reversal occurred.` +
+    (altOn
+      ? ` To reduce local light adaptation, the pattern was phase-inverted ` +
+        `(light and dark exchanged) on every even-numbered trial, ` +
+        `so that alternating ON phases presented complementary pattern phases.`
+      : '')
+  );
+
+  // ── Start delay ───────────────────────────────────────────────────────────
+  if (startDel > 0) {
+    parts.push(`A blank pre-stimulus interval of ${startDel} ms preceded the first trial, `
+      + `and an interval of the same length followed the last.`);
+  }
+
+  // ── Display ───────────────────────────────────────────────────────────────
+  const fpsStr  = fpsPhrase(fpsInfo);
+  /* Which surface is the stimulus actually presented on? When a separate
+     stimulus window is open the stimulation runs THERE, so the geometry must
+     come from that window rather than from this settings window. */
+  const _fieldGeom = VEP.stimulusField({
+    childOpen        : !!(_childWin && !_childWin.closed),
+    childW           : _childCanvasW,
+    childH           : _childCanvasH,
+    childFullscreen  : _childFullscreen,
+    sessionW         : sessionCanvasWidth_px,
+    sessionH         : sessionCanvasHeight_px,
+    sessionFullscreen: useFullscreen,
+    formFullscreen   : fb('useFullscreen'),
+  });
+  const canvW = _fieldGeom.w;
+  const canvH = _fieldGeom.h;
+  const canvW_deg    = +(canvW / ppd).toFixed(1);
+  const canvH_deg    = +(canvH / ppd).toFixed(1);
+  const canvHalf_deg = +(canvW_deg / 2).toFixed(1);
+  const isFS  = _fieldGeom.fullscreen;
+  const modeStr      = isFS
+    ? 'in fullscreen mode'
+    : `in a windowed browser (window size ${canvW} × ${canvH} px)`;
+  parts.push(
+    `The stimulus was rendered on a ${canvW} × ${canvH} px canvas ${modeStr}, ` +
+    `subtending ${canvW_deg} × ${canvH_deg} deg of visual angle ` +
+    `(±${canvHalf_deg} deg horizontally from fixation). ` +
+    `The display was ${scrWcm} cm wide, viewed from ${viewDist} cm, ` +
+    `corresponding to approximately ${ppd} px/deg. ` +
+    `Animation frames were delivered at ${fpsStr}; all frame-locked durations are `
+    + `computed against that rate.` + (function () {
+        /* No browser API reports a display's refresh rate, so it is stated only
+           when the operator supplied it — and any disagreement with the delivered
+           rate is stated too, since it means the panel never showed every frame. */
+        const dHz = declaredRefreshHz();
+        if (!dHz) return '';
+        let out = ` The presentation display was set to ${dHz} Hz.`;
+        if (isFinite(fps) && fps > 0 && Math.abs(fps / dHz - 1) > 0.05) {
+          /* Whichever of the two is slower is what the stimulus was really
+             quantised to, so state that rather than assuming a direction. */
+          const limitHz = Math.min(fps, dHz);
+          out += ` These differ: the browser paced the stimulus at a rate other than that of `
+               + `the display presenting it, so the effective temporal resolution was `
+               + `${limitHz.toFixed(1)} Hz, the slower of the two.`;
+        }
+        return out;
+      })()
+  );
+
+  // ── Sync ──────────────────────────────────────────────────────────────────
+  const dotFrames  = fv('syncDotFrames');
+  const syncEvents = [];
+  if (fb('syncOnOnset'))  syncEvents.push('pattern onset');
+  if (fb('syncOnOffset')) syncEvents.push('pattern offset');
+  if (syncEvents.length) {
+    parts.push(
+      `A ${dotSz} × ${dotSz} px photodiode trigger patch (${syncCol}, ` +
+      `${dotFrames} frame${dotFrames > 1 ? 's' : ''} duration, black between triggers) ` +
+      `was presented at screen ` +
+      `position (${fv('dot_x')}, ${fv('dot_y')}) px at ${syncEvents.join(' and ')}.`
+    );
+  }
+
+  // ── Fixation ──────────────────────────────────────────────────────────────
+  if (fb('showFixation')) {
+    const fixRad   = fv('fixationRadius');
+    const fixRadPx = Math.round(fixRad * ppd);
+    parts.push(
+      `A fixation cross (arm radius ${fixRad} deg / ${fixRadPx} px, ` +
+      `${fv('fixationThickness')} px thick, color ${f('hexFixation').value}) ` +
+      `was superimposed at the screen center throughout the session, including the OFF phases.`
+    );
+  }
+
+  // ── Masks ─────────────────────────────────────────────────────────────────
+  const maskDescs = [];
+  if (fb('maskCentral')) {
+    const r = fv('maskCentralRad');
+    maskDescs.push(`a central circular region within ${r} deg (${Math.round(r * ppd)} px) of fixation`);
+  }
+  if (fb('maskPeripheral')) {
+    const r = fv('maskPeripheralRad');
+    maskDescs.push(`all regions beyond ${r} deg (${Math.round(r * ppd)} px) of fixation`);
+  }
+  ['maskQ1','maskQ2','maskQ3','maskQ4']
+    .map((id,i) => ({ name:['top-right','top-left','bottom-left','bottom-right'][i], on:fb(id), rad:fv(id+'Rad') }))
+    .filter(q => q.on)
+    .forEach(q => maskDescs.push(
+      `the ${q.name} quadrant within ${q.rad} deg (${Math.round(q.rad * ppd)} px)`
+    ));
+  if (maskDescs.length) {
+    parts.push(
+      `The following regions were masked (replaced with a uniform field of ${f('hexMask').value}) ` +
+      `during the ON phase: ` + maskDescs.join('; ') + '.'
+    );
+  }
+
+  // ── Gamma calibration ────────────────────────────────────────────────────
+  if (gammaCalibration) {
+    const mc = gammaMichelsonContrast();
+    const Lmax_s = gammaFns && gammaFns.L_max ? gammaFns.L_max.toFixed(1) : '?';
+    const Lmin_s = gammaFns && gammaFns.L_min != null ? gammaFns.L_min.toFixed(2) : '?';
+    /* Only meaningful when the pattern actually alternates between two phases.
+       With alternation off, pattern onset shows a single phase against a blank
+       field, so there are no two phases to equalise. The applied shift is
+       still recorded in the log as dc_correction_cdm2 either way. */
+    const _dcRep = gammaDCShiftReported();
+    const dc_s   = (altOn && Math.abs(gammaDCShift_cdm2) > 0.001)
+      ? ` A luminance DC correction of ${_dcRep > 0 ? '+' : ''}${_dcRep.toFixed(2)} cd/m\u00B2 was applied to equalize the mean luminance of the two pattern phases.`
+      : '';
+    /* Holding the mean luminance constant is not free: the whole LUT is shifted,
+       and where that pushes the profile past the display's black or white limit
+       the waveform clips. Clipping flattens the extremes of the sinusoid, which
+       adds harmonic distortion and so changes the pattern's spatial-frequency
+       content. Reported whenever a correction was actually applied. */
+    const _dcClipPct = 100 * (gammaDCClipLow_frac + gammaDCClipHigh_frac);
+    const dcSat_s = Math.abs(gammaDCShift_cdm2) > 0.001
+      ? ' Holding the mean luminance constant requires shifting the entire lookup'
+        + ' table, which can alter the spatial-frequency content of the pattern.'
+        + (_dcClipPct > 0
+            ? ` With this calibration the shift saturated ${_dcClipPct.toFixed(1)}%`
+              + ` of the luminance profile (${(100 * gammaDCClipLow_frac).toFixed(1)}% at the black limit,`
+              + ` ${(100 * gammaDCClipHigh_frac).toFixed(1)}% at the white limit); the luminance waveform is`
+              + ' therefore clipped, adding harmonic distortion to the nominal spatial frequency.'
+            : ' No saturation occurred at either limit.')
+      : '';
+    parts.push(
+      `Stimuli were rendered using a gamma-linearized lookup table (model: ${gammaCalibration.model}; ` +
+      `L_max = ${Lmax_s} cd/m\u00B2, L_min = ${Lmin_s} cd/m\u00B2; ` +
+      `calibration date: ${formatCalibrationDate(new Date(gammaCalibration.calibration_date))}).` +
+      (mc != null ? ` Michelson contrast in luminance was ${(mc * 100).toFixed(1)}%.` : '') +
+      (function () {
+        const L = patternLuminances();
+        if (!L || !luminanceIsMeasured()) return '';
+        let out = ` Luminances estimated from the measured transfer function were `
+             + `${L.L_light.toFixed(1)} cd/m\u00B2 for the light phase and `
+             + `${L.L_dark.toFixed(1)} cd/m\u00B2 for the dark phase `
+             + `(mean ${L.L_mean.toFixed(1)} cd/m\u00B2); these are estimates derived from `
+             + `the display calibration, not photometric measurements of this session.`;
+        out += channelsWereMeasured()
+             ? ' The relative luminance of the red, green and blue primaries was measured '
+               + 'individually.'
+             : ' The relative luminance of the primaries was not measured; it was taken from '
+               + 'the BT.709/sRGB coefficients (0.2126, 0.7152, 0.0722), applied to linear '
+               + 'light (Rec. ITU-R BT.709-6, 2015; IEC 61966-2-1:1999). Chromatic contrast '
+               + 'and isoluminance therefore rest on that assumption rather than on measurement.';
+        return out;
+      })() + dc_s + dcSat_s
+    );
+  } else {
+    /* Without a calibration the contrast is still worth stating, but only as
+       what it is: a figure resting on the sRGB assumption, not a measurement. */
+    const L = patternLuminances();
+    if (L && L.contrast != null) {
+      parts.push(
+        `No display calibration was in force; sRGB was assumed, so luminances are `
+        + `relative and none is reported. Michelson contrast under that assumption `
+        + `was ${(L.contrast * 100).toFixed(1)}%.`
+      );
+    }
+  }
+
+  /* ── Renderer ── */
+  parts.push(
+    _effectiveWebGL()
+      ? 'Stimuli were rendered using a WebGL\u00a02 fragment shader (pattern computed per-pixel on the GPU).'
+      : 'Stimuli were rendered using the Canvas\u00a02D API with a precomputed per-pixel lookup table.'
+  );
+
+
+
+  /* ── Pause ── */
+  const _pauseEvts = logData.filter(function (e) { return e.event === 'pause'; });
+  if (_pauseEvts.length > 0)
+    parts.push('The session was paused ' + _pauseEvts.length
+      + ' time' + (_pauseEvts.length > 1 ? 's' : '') + ' by the operator.');
+
+  const text = parts.join('\n\n');
+  const el = document.getElementById('apaPreview');
+  el.textContent = text;
+  return text;
+}
+
+
+
+document.addEventListener('click', e => {
+  if (e.target.id === 'urlPreview') copyURLPreview();
+  if (e.target.id === 'apaPreview') copyAPADescription();
+});
+
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Gamma calibration module
+   The calibration behaves like every other parameter on this page: it arrives
+   in the URL ('cal=<base64-json>', normally written by vep_gate.html) or from a
+   calibration .json loaded here, which overrides the URL. Whatever is active is
+   re-encoded into the generated URL, so the stimulus window and any copied link
+   carry it too.
+   No localStorage: the key 'vep_gamma_calibration' is read and written by
+   vep_gate.html alone, so a stored calibration is chosen in exactly one place
+   and this page can never silently disagree with it.
+   Warning after GAMMA_WARN_DAYS days.
+   ══════════════════════════════════════════════════════════════════════════ */
+const GAMMA_WARN_DAYS = 30;
+
+let gammaCalibration  = null;   // active calibration object (null → sRGB assumed)
+let gammaCalSource    = 'none'; // 'url' | 'file' | 'none' — provenance, logged
+let gammaCalFileName  = '';     // name of the originating .json, when known
+let gammaCalPinned    = false;  // set explicitly (file here, or pushed by the parent):
+                                // must survive a re-read of this window's URL
+let gammaFns          = null;   // { R:{fwd,inv}, G:{fwd,inv}, B:{fwd,inv}, grey:{fwd,inv}, L_max, L_min }
+let gammaDCShift_cdm2 = 0;      /* DC correction applied to the radial LUT, in the
+                                   per-channel-average units the LUT maths works in.
+                                   Use gammaDCShiftReported() for anything shown or
+                                   logged — see the note there. */
+/* Saturation caused by that correction. Shifting the whole LUT to hold the mean
+   luminance can push part of the profile past the display's black or white
+   limit; those entries clip, so the luminance waveform is no longer the
+   intended sinusoid and its spatial-frequency content changes. Reported in the
+   log and in the methods text. */
+let gammaDCClipLow_frac  = 0;   // fraction of LUT entries saturated at black
+let gammaDCClipHigh_frac = 0;   // fraction of LUT entries saturated at white
+
+/** Build gamma functions from a calibration object (or null for sRGB). */
+const gBuildGammaFns   = VEP.buildGammaFns;
+
+/** URL-safe base64 decode for the 'cal' query parameter. */
+const gDecodeCalFromURL= VEP.decodeCalFromURL;
+
+/** URL-safe base64 encode for the 'cal' query parameter. */
+const gEncodeCalForURL = VEP.encodeCalForURL;
+
+/**
+ * Load the calibration from the URL query parameter 'cal=<base64-json>', with
+ * 'cal_name' carrying the name of the file it originally came from.
+ * A calibration loaded from a file on this page wins and is preserved: this
+ * function also runs when a session starts, and must not discard it. Reload
+ * the page to go back to the calibration carried by the URL.
+ */
+function loadGammaCalibration() {
+  /* Pinned means the calibration was set deliberately — loaded from a file here
+     or handed over by the parent at Start. That includes deliberately having
+     none: falling back to this window's URL would silently reinstate a stale
+     calibration the operator had just cleared. */
+  if (gammaCalPinned) {
+    gammaFns = gBuildGammaFns(gammaCalibration);
+    gammaDCShift_cdm2 = 0;
+    return;
+  }
+  let cal = null, calName = '';
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const calStr = params.get('cal');
+    if (calStr) cal = gDecodeCalFromURL(calStr);
+    calName = params.get('cal_name') || '';
+  } catch(e) {}
+  gammaCalibration = cal;
+  gammaCalFileName = cal ? calName : '';
+  gammaCalSource   = cal ? (calName ? 'file' : 'url') : 'none';
+  gammaFns = gBuildGammaFns(gammaCalibration);
+  gammaDCShift_cdm2 = 0;
+}
+
+/**
+ * Take the calibration the parent had active when Start was pressed. Without
+ * this the stimulus window would keep whatever was in its own URL at the moment
+ * it was opened, so a calibration loaded afterwards would not reach it and the
+ * log would still name the old source until the window was reopened.
+ */
+function _applyCalibrationFromParent(enc, name) {
+  const cal = enc ? gDecodeCalFromURL(enc) : null;
+  gammaCalibration  = cal;
+  gammaCalFileName  = cal ? (name || '') : '';
+  gammaCalSource    = cal ? (name ? 'file' : 'url') : 'none';
+  gammaCalPinned    = true;   // authoritative: do not re-read this window's URL
+  gammaFns          = gBuildGammaFns(gammaCalibration);
+  gammaDCShift_cdm2 = 0;
+}
+
+/**
+ * Load a calibration .json exported by display_calibration.html. It replaces
+ * the URL calibration and is written straight back into the generated URL, so
+ * the stimulus window and any link copied afterwards use it as well.
+ */
+function loadCalibrationFromFile(file) {
+  const msgEl = document.getElementById('calFileMsg');
+  function say(text, colour) {
+    if (msgEl) { msgEl.textContent = text; msgEl.style.color = colour; }
+  }
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function (ev) {
+    let cal = null;
+    try { cal = JSON.parse(ev.target.result); } catch (e) { cal = null; }
+    if (!cal || typeof cal !== 'object' || !cal.model || cal.L_max_cdm2 == null) {
+      say('Invalid calibration file: expected the .json saved by display_calibration.html.', '#e8a55a');
+      return;
+    }
+    const _prevHadCal = !!gammaCalibration;
+    const _prevLmax   = gammaFns ? gammaFns.L_max : null;
+    gammaCalibration  = cal;
+    gammaCalSource    = 'file';
+    gammaCalFileName  = file.name || '';
+    gammaCalPinned    = true;
+    gammaFns          = gBuildGammaFns(gammaCalibration);
+    gammaDCShift_cdm2 = 0;
+    say('Calibration loaded.', '#59c08b');   // the name itself is shown in the status line
+    updateCalibrationStatusEl('calibrationStatus');
+    convertMeanLuminanceUnits(_prevHadCal, _prevLmax);
+    seedMeanLuminanceIfEmpty();    // only fills a blank field; never overwrites
+    updateContrastReadout();
+    try { updateURLPreview();    } catch (e) {}
+    try { buildAPADescription(); } catch (e) {}
+  };
+  reader.onerror = function () { say('Could not read the file.', '#e8a55a'); };
+  reader.readAsText(file);
+}
+
+/**
+ * Build a gamma-corrected LUT for the radial sinusoidal pattern.
+ * Generates lutR/G/B so the sine wave is sinusoidal in luminance (cd/m²),
+ * not in digital values.
+ */
+function buildGammaCorrectedLUT(TWO_PI) {
+  const gf = gammaFns;
+  // Convert endpoints to linear luminance
+  const Ld_r = gf.R.fwd(colDark.r),  Ll_r = gf.R.fwd(colLight.r);
+  const Ld_g = gf.G.fwd(colDark.g),  Ll_g = gf.G.fwd(colLight.g);
+  const Ld_b = gf.B.fwd(colDark.b),  Ll_b = gf.B.fwd(colLight.b);
+  for (let i = 0; i < LUT_SIZE; i++) {
+    const t = 0.5 + 0.5 * Math.sin((i / LUT_SIZE) * TWO_PI);
+    lutR[i] = Math.max(0, Math.min(255, gf.R.inv(Ld_r + (Ll_r - Ld_r) * t)));
+    lutG[i] = Math.max(0, Math.min(255, gf.G.inv(Ld_g + (Ll_g - Ld_g) * t)));
+    lutB[i] = Math.max(0, Math.min(255, gf.B.inv(Ld_b + (Ll_b - Ld_b) * t)));
+  }
+}
+
+/**
+ * Compute and apply DC luminance correction to the radial LUT.
+ * Must be called AFTER baseIdx has been built.
+ * Shifts all LUT entries so that Phase A and Phase B have identical
+ * mean luminance, correcting for the CMF area-weighting imbalance.
+ * Returns the applied shift in cd/m².
+ */
+function applyGammaDCCorrection(baseIdxArr) {
+  const gf = gammaFns;
+  const N = baseIdxArr.length;
+  // Mean luminance of Phase A across all pixels (grey proxy: average of RGB)
+  let sumL = 0;
+  for (let p = 0; p < N; p++) {
+    const idx = baseIdxArr[p];
+    sumL += (gf.R.fwd(lutR[idx]) + gf.G.fwd(lutG[idx]) + gf.B.fwd(lutB[idx])) / 3;
+  }
+  const meanL = sumL / N;
+  // Target mean: midpoint of dark and light in luminance
+  const Ld = (gf.R.fwd(colDark.r)  + gf.G.fwd(colDark.g)  + gf.B.fwd(colDark.b))  / 3;
+  const Ll = (gf.R.fwd(colLight.r) + gf.G.fwd(colLight.g) + gf.B.fwd(colLight.b)) / 3;
+  const L_target = (Ld + Ll) / 2;
+  const shift = L_target - meanL;
+  // Luminance actually representable by each channel; anything outside saturates.
+  const RminR = gf.R.fwd(0), RmaxR = gf.R.fwd(255);
+  const RminG = gf.G.fwd(0), RmaxG = gf.G.fwd(255);
+  const RminB = gf.B.fwd(0), RmaxB = gf.B.fwd(255);
+
+  // Apply shift to entire LUT, counting entries that saturate.
+  let clipLow = 0, clipHigh = 0;
+  for (let i = 0; i < LUT_SIZE; i++) {
+    const tR = gf.R.fwd(lutR[i]) + shift;
+    const tG = gf.G.fwd(lutG[i]) + shift;
+    const tB = gf.B.fwd(lutB[i]) + shift;
+    if      (tR < RminR || tG < RminG || tB < RminB) clipLow++;
+    else if (tR > RmaxR || tG > RmaxG || tB > RmaxB) clipHigh++;
+    lutR[i] = Math.max(0, Math.min(255, gf.R.inv(tR)));
+    lutG[i] = Math.max(0, Math.min(255, gf.G.inv(tG)));
+    lutB[i] = Math.max(0, Math.min(255, gf.B.inv(tB)));
+  }
+  gammaDCShift_cdm2    = shift;
+  gammaDCClipLow_frac  = clipLow  / LUT_SIZE;
+  gammaDCClipHigh_frac = clipHigh / LUT_SIZE;
+  if (clipLow + clipHigh > 0) {
+    console.warn('Gamma DC correction saturated '
+      + (100 * (clipLow + clipHigh) / LUT_SIZE).toFixed(1)
+      + '% of the luminance profile — the pattern waveform is clipped, which '
+      + 'alters its spatial-frequency content.');
+  }
+  return shift;
+}
+
+/** Compute Michelson contrast in cd/m² for the current colour pair. */
+function gammaMichelsonContrast() {
+  const L = patternLuminances();
+  return L ? L.contrast : null;
+}
+
+/** Luminance of the light and dark pattern phases, via the shared contrast
+    tools: each channel measured from its own dark point, summed, normalised to
+    the measured white. A saturated pattern colour is no longer treated as its
+    mean code value. */
+function patternLuminances() {
+  if (!gammaFns) return null;
+  const Ll = VEP.luminanceOfRGB(gammaFns, colLight);
+  const Ld = VEP.luminanceOfRGB(gammaFns, colDark);
+  if (Ll == null || Ld == null) return null;
+  return { L_light: Ll, L_dark: Ld, L_mean: (Ll + Ld) / 2,
+           contrast: VEP.michelson(Ll, Ld) };
+}
+
+/**
+ * The DC correction is computed and applied as a shift of the per-channel
+ * average, because that is the space the LUT is built in. Adding the same shift
+ * to all three channels moves the field luminance by three times as much, times
+ * the additivity factor, so anything reported alongside L_light/L_dark/L_mean
+ * has to be converted or the two numbers are on different scales.
+ * (Equalising the mean in either space is equivalent, so the stimulus itself is
+ * unaffected by this conversion; only the reported magnitude changes.)
+ */
+function gammaDCShiftReported() {
+  const k = (gammaFns && gammaFns.additivity != null) ? gammaFns.additivity : 1;
+  return 3 * k * gammaDCShift_cdm2;
+}
+
+
+
+
+/** Short note for the readout: never leave the basis of the numbers implicit. */
+function channelBasisNote() {
+  return channelsWereMeasured()
+    ? ' \u00B7 R/G/B measured'
+    : ' \u00B7 R/G/B assumed from sRGB primaries';
+}
+
+/* ── Contrast generator ─────────────────────────────────────────────────────
+   The colours stay the single source of truth: this writes into the Light and
+   Dark fields and nothing stores the requested contrast. The readout always
+   describes the colours as they are, so it stays honest after a manual edit. */
+
+/** Unit shown next to Mean luminance: cd/m^2 only when a calibration defines it. */
+function contrastUnitLabel() {
+  return gammaCalibration ? 'cd/m\u00B2' : 'relative';
+}
+
+/** Refresh the achieved-contrast line and the mean-luminance unit. */
+function updateContrastReadout(extra, extraColour) {
+  const unitEl = document.getElementById('meanLumUnit');
+  if (unitEl) unitEl.textContent = contrastUnitLabel();
+  const el = document.getElementById('contrastReadout');
+  if (!el) return;
+  const L = patternLuminances();
+  if (!L || L.contrast == null) { el.textContent = ''; return; }
+  const pct = (L.contrast * 100).toFixed(1);
+  let text = `Current colors: Michelson contrast ${pct}%`;
+  if (luminanceIsMeasured()) {
+    text += ` \u00B7 light ${L.L_light.toFixed(1)}, dark ${L.L_dark.toFixed(1)}, `
+          + `mean ${L.L_mean.toFixed(1)} cd/m\u00B2 (estimated)`;
+  } else if (gammaCalibration) {
+    text += ` \u00B7 luminances modeled, not measured`;
+  } else {
+    text += ` \u00B7 sRGB assumed, no calibration`;
+  }
+  text += channelBasisNote();
+  el.textContent = text;
+  el.style.color = 'var(--text-mute)';
+  if (extra) {
+    el.textContent = extra + ' \u2014 ' + text;
+    if (extraColour) el.style.color = extraColour;
+  }
+}
+
+
+/** Derive the Light and Dark colours from the requested contrast and mean
+    luminance. Each colour slides along its own ray towards black, so both keep
+    their chromaticity and a request of 0% yields the isoluminant pair. */
+/**
+ * Move the blank to a luminance, along its own ray: it keeps its chromaticity
+ * and changes only in brightness. Returns '' on success, otherwise the reason
+ * the display cannot reach that luminance (the blank is then left as it was).
+ */
+function _matchBlankToLuminance(L) {
+  const b = VEP.solveContrastPairOnRays(gammaFns, {
+    colourA: colBlank, colourB: colBlank, contrast: 0, meanLuminance: L
+  });
+  if (!b.ok) return b.reason || 'outside the display range';
+  setColourPair('hexBlank', 'swatchBlank', colBlank, b.a);
+  return '';
+}
+
+/**
+ * On load, with "Blank at pattern mean" ticked, start the blank at the mean
+ * luminance of the pattern colours, so the default onset carries no luminance
+ * step. A link that sets hexBlank is a recorded condition and is left exactly
+ * as written.
+ */
+function _matchBlankOnLoad() {
+  const box = document.getElementById('blankFollowsMean');
+  if (!box || !box.checked || !gammaFns) return;
+  if (new URLSearchParams(window.location.search).has('hexBlank')) return;
+  const L = (VEP.luminanceOfRGB(gammaFns, colLight) + VEP.luminanceOfRGB(gammaFns, colDark)) / 2;
+  _matchBlankToLuminance(L);
+}
+
+function applyContrastToColours() {
+  const cEl = document.getElementById('targetContrast');
+  const mEl = document.getElementById('targetMeanLum');
+  if (!cEl || !mEl || !gammaFns) return;
+  const C  = Number(cEl.value) / 100;
+  const Lm = Number(mEl.value);
+  const res = VEP.solveContrastPairOnRays(gammaFns, {
+    colourA: colLight, colourB: colDark, contrast: C, meanLuminance: Lm
+  });
+  if (!res.ok) {
+    updateContrastReadout('Cannot apply: ' + res.reason, '#e8a55a');
+    return;
+  }
+  setColourPair('hexLight', 'swatchLight', colLight, res.a);
+  setColourPair('hexDark',  'swatchDark',  colDark,  res.b);
+
+  /* Pattern onset appears and disappears against the blank field, so unless the
+     blank sits at the pattern's mean luminance the onset carries a luminance
+     step on top of the pattern — a confound the response cannot distinguish
+     from the pattern itself. Matching it is offered, not imposed: the colour
+     stays editable and the checkbox turns this off. The blank keeps its own
+     chromaticity and only moves in luminance. */
+  const blankBox = document.getElementById('blankFollowsMean');
+  let extra = 'Applied';
+  if (blankBox && blankBox.checked) {
+    const why = _matchBlankToLuminance(res.L_mean);
+    extra = why ? 'Applied \u2014 blank could not be matched: ' + why
+                : 'Applied, blank matched to pattern mean';
+  }
+  updateContrastReadout(extra, '#59c08b');
+  try { updateURLPreview();    } catch (e) {}
+  try { buildAPADescription(); } catch (e) {}
+}
+
+/**
+ * Link back to the gate carrying the shared parameters this page currently
+ * holds, plus the calibration.
+ *
+ * The gate is reused rather than reopened, which means following a bare link
+ * would re-navigate an open gate and wipe the settings of the session: the
+ * gate's fields are not stored anywhere, they only exist in its form. Handing
+ * them back in the query string turns that from a loss into something useful —
+ * the gate returns showing the parameters actually in use.
+ */
+function buildGateBackURL() {
+  const p = new URLSearchParams();
+  /* Exactly the parameters the gate owns; everything else stays here. */
+  const SHARED = ['screen_width_px', 'screen_width_cm', 'view_distance_cm', 'displayRefreshHz', 'dot_x', 'dot_y', 'dotSize', 'hexSync1', 'syncDotFrames', 'useFullscreen', 'enableLogging'];
+  SHARED.forEach(function (id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    p.set(id, (el.type === 'checkbox') ? String(el.checked) : el.value);
+  });
+  const noteEl = document.getElementById('noteField');
+  if (noteEl && noteEl.value) p.set('note', noteEl.value);
+  try {
+    const cal = gEncodeCalForURL(gammaCalibration);
+    if (cal) {
+      p.set('cal', cal);
+      if (gammaCalSource === 'file' && gammaCalFileName) p.set('cal_name', gammaCalFileName);
+    }
+  } catch (e) {}
+  return 'vep_gate.html?' + p.toString();
+}
+
+/** Suggest a mean luminance the display can actually reach: half of L_max. */
+/**
+ * Mean luminance is a fraction of full scale when no calibration is loaded and
+ * cd/m^2 once one is, so the same number means two different things either side
+ * of that change. Rescale it so it keeps meaning the same fraction of the
+ * display's range. This converts the operator's own value rather than replacing
+ * it with a default — the field never silently acquires a number nobody chose.
+ */
+function convertMeanLuminanceUnits(hadCalibration, prevLmax) {
+  const mEl = document.getElementById('targetMeanLum');
+  if (!mEl || !gammaFns) return;
+  if (hadCalibration === !!gammaCalibration) return;   // the unit did not change
+  const v = parseFloat(mEl.value);
+  if (!isFinite(v) || !(prevLmax > 0)) return;
+  const converted = v / prevLmax * gammaFns.L_max;
+  mEl.value = gammaCalibration ? converted.toFixed(1) : converted.toFixed(3);
+}
+
+/**
+ * Put a usable starting value in Mean luminance, but only when the operator has
+ * not set one. Loading a calibration must not rewrite it: it is an input like
+ * any other, and silently moving it would change the stimulus behind the
+ * operator's back. The step size does follow the calibration, since that is
+ * only how far the spinner moves, not what the field says.
+ * Note the field keeps its number when the unit changes from relative to cd/m^2.
+ * That is deliberate — if the number no longer suits the display, Apply says so
+ * rather than quietly substituting a different one.
+ */
+function seedMeanLuminanceIfEmpty() {
+  const mEl = document.getElementById('targetMeanLum');
+  if (!mEl || !gammaFns) return;
+  mEl.step = gammaCalibration ? '0.1' : '0.01';
+  if (String(mEl.value).trim() !== '') return;
+  const half = gammaFns.L_max / 2;
+  mEl.value = gammaCalibration ? half.toFixed(1) : half.toFixed(3);
+}
+
+
+/* ── Frame delivery rate of the surface that presents the stimulus ────────
+   The methods text, the refresh-mismatch note and every duration derived from
+   the frame rate must describe the display the subject looks at. When a
+   separate stimulus window is open — typically on a second monitor — that is
+   the stimulus window's rate, not this window's: the two monitors may run at
+   different rates (60 against 120 Hz is common), and this window's own figure
+   would then describe the operator's screen.
+   So the two are kept apart, each with how it was obtained:
+     this window      exact after a local session (measuredFPS), otherwise the
+                      estimate taken when the page loaded;
+     stimulus window  exact from its session start, or the estimate it sends
+                      while idle. The most recent report wins, so moving that
+                      window to another display after a run replaces the old
+                      exact figure with a fresh estimate instead of keeping a
+                      rate the subject's display no longer runs at.
+   This window's own measuredFPS is never overwritten with the stimulus
+   window's figure: it times a local run, and must stay what it measured. */
+let _localProbeFPS = 0;
+let _childFPS = { hz: 0, exact: false };
+
+
+
+/** The frame-rate box on the settings panel, from the same source. */
+function refreshFpsDisplay() {
+  const el = document.getElementById('fpsDisplay');
+  if (!el) return;
+  const f = presentationFPS();
+  const where = (f.where === 'child') ? 'stimulus display' : 'this display';
+  if (!(f.hz > 0)) {
+    el.textContent = (f.where === 'child') ? '— (stimulus window: measuring…)'
+                                           : '— (measured at session start)';
+    return;
+  }
+  el.textContent = f.exact
+    ? f.hz.toFixed(1) + ' Hz' + (f.where === 'child' ? ' (stimulus display, measured)' : '')
+    : '≈ ' + Math.round(f.hz) + ' Hz (' + where + ') · exact rate measured at session start';
+}
+
+
+let _childScreenW = 0;   // width of the screen the presentation window is on (CSS px)
+
+
+/** Update a UI element with the current calibration status. */
+
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Session state
+   ══════════════════════════════════════════════════════════════════════════ */
+let state            = 'INIT';   // INIT | MEASURE | DELAY | ON | OFF
+let stateStart       = 0;
+let trial            = 0;
+let onFrameCount     = 0;
+let offFrameCount    = 0;
+
+/* Canvas size captured at session start — the actual stimulation area. */
+let sessionCanvasWidth_px  = 0;
+let sessionCanvasHeight_px = 0;
+
+// Pre-computed frame counts derived after FPS measurement (Math.round).
+let onDurationFrames  = 0;
+let offDurationFrames = 0;
+
+let firstOnsetTime_perf = null;
+let sessionStart_ms  = 0;
+let sessionStart_iso = '';
+let logData          = [];
+
+let measuredFPS      = 0;
+const MEASURE_FRAMES = 60;
+let   measureSamples = [];
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Parameters  (defaults; overwritten by readParams at session start)
+   ══════════════════════════════════════════════════════════════════════════ */
+let patternType   = 'checker';
+let cent_freq     = 1;
+let per_freq      = 0.05;
+let checkSize_deg = 1;
+
+let nCycles     = 100;
+let onDuration  = 200;    // ms — pattern visible
+let offDuration = 800;    // ms — blank screen
+let startDelay  = 3000;   // ms
+let alternatePattern = true;  // phase-invert on even trials to prevent adaptation
+
+let colLight    = { r: 255, g: 255, b: 255 };
+let colDark     = { r:   0, g:   0, b:   0 };
+let colBlank    = { r: 128, g: 128, b: 128 };  // OFF-phase background (mid-grey)
+let colFixation = { r: 255, g:   0, b:   0 };
+let colSync     = { r: 255, g: 255, b: 255 }; // sync dot when triggered
+let colMask     = { r: 128, g: 128, b: 128 };
+
+let screen_width_px  = 0;
+let screen_width_cm  = 53;
+let view_distance_cm = 57;
+let useFullscreen    = false;
+let enableLogging    = false;
+let userNote         = '';
+let pixelsPerDegree  = 36;
+
+let syncOnOnset  = true;
+let syncOnOffset = false;
+let syncDotFrames = 2;
+
+let fixationRadiusDeg   = 0.25;
+let fixationThicknessPx = 2;
+let showFixation  = true;
+
+let maskCentral = false; let maskCentralRad_deg    = 2;
+let maskPeripheral = false; let maskPeripheralRad_deg = 10;
+let maskQ1 = false; let maskQ1Rad_deg = 5;
+let maskQ2 = false; let maskQ2Rad_deg = 5;
+let maskQ3 = false; let maskQ3Rad_deg = 5;
+let maskQ4 = false; let maskQ4Rad_deg = 5;
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Rendering data structures
+   ══════════════════════════════════════════════════════════════════════════ */
+const LUT_SIZE = 1024;
+const LUT_MASK = LUT_SIZE - 1;
+let dotSize = 32;   // configurable via form / URL
+
+let lutR = new Uint8ClampedArray(LUT_SIZE);
+let lutG = new Uint8ClampedArray(LUT_SIZE);
+let lutB = new Uint8ClampedArray(LUT_SIZE);
+
+let baseIdx      = null;   // per-pixel LUT index (static — no offset needed)
+let _phiIdxByR   = null;   // per-radius LUT index (radial pattern; for WebGL uploadPhi)
+let _phiIdxByR_n = 0;
+let currentPhaseOffset = 0;  // 0 = normal, LUT_SIZE/2 = phase-inverted (alternation)
+let imgData      = null;
+let imgBuf       = null;
+let ctx2d        = null;
+
+let dotPos         = { x: 32, y: 32 };
+let dotFlashFrames = 0;
+let dotPixels      = null;
+
+let crossPixels      = null;
+let maskCentralPx    = null;
+let maskPeripheralPx = null;
+let maskQ1Px = null, maskQ2Px = null, maskQ3Px = null, maskQ4Px = null;
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Parameter reading
+   ══════════════════════════════════════════════════════════════════════════ */
+function readParams() {
+  const f = id => document.getElementById(id);
+  patternType      = getPatternType();
+  cent_freq        = +f('cent_freq').value;
+  per_freq         = +f('per_freq').value;
+  checkSize_deg    = +f('checkSize').value;
+  alternatePattern =  f('alternatePattern').checked;
+  nCycles          = +f('nCycles').value;
+  onDuration       = +f('onDuration').value;
+  offDuration      = +f('offDuration').value;
+  startDelay       = +f('startDelay').value;
+  screen_width_px  = +f('screen_width_px').value;
+  screen_width_cm  = +f('screen_width_cm').value;
+  view_distance_cm = +f('view_distance_cm').value;
+  enableLogging    =  f('enableLogging').checked;
+  useFullscreen    =  f('useFullscreen').checked;
+  userNote         =  f('noteField').value || '';
+  syncDotFrames    = +f('syncDotFrames').value;
+  dotSize         = Math.max(1, +f('dotSize').value || 32);
+  syncOnOnset      =  f('syncOnOnset').checked;
+  syncOnOffset     =  f('syncOnOffset').checked;
+  showFixation          =  f('showFixation').checked;
+  fixationRadiusDeg     = +f('fixationRadius').value;
+  fixationThicknessPx   = Math.max(1, Math.round(+f('fixationThickness').value));
+  maskCentral           =  f('maskCentral').checked;
+  maskCentralRad_deg    = +f('maskCentralRad').value;
+  maskPeripheral        =  f('maskPeripheral').checked;
+  maskPeripheralRad_deg = +f('maskPeripheralRad').value;
+  maskQ1 = f('maskQ1').checked; maskQ1Rad_deg = +f('maskQ1Rad').value;
+  maskQ2 = f('maskQ2').checked; maskQ2Rad_deg = +f('maskQ2Rad').value;
+  maskQ3 = f('maskQ3').checked; maskQ3Rad_deg = +f('maskQ3Rad').value;
+  maskQ4 = f('maskQ4').checked; maskQ4Rad_deg = +f('maskQ4Rad').value;
+  const dx = +f('dot_x').value, dy = +f('dot_y').value;
+  if (isFinite(dx)) dotPos.x = dx;
+  if (isFinite(dy)) dotPos.y = dy;
+
+  const cm_per_pixel  = screen_width_cm / screen_width_px;
+  const cm_per_degree = 2 * view_distance_cm * Math.tan(0.5 * Math.PI / 180);
+  pixelsPerDegree = cm_per_degree / cm_per_pixel;
+  if (!isFinite(pixelsPerDegree) || pixelsPerDegree <= 0) pixelsPerDegree = 36;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Precomputation
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** Sinusoidal LUT for radial pattern. */
+function precomputeLUT_Radial() {
+  const TWO_PI = Math.PI * 2;
+  for (let i = 0; i < LUT_SIZE; i++) {
+    const t = 0.5 + 0.5 * Math.sin((i / LUT_SIZE) * TWO_PI);
+    lutR[i] = (colDark.r + (colLight.r - colDark.r) * t) | 0;
+    lutG[i] = (colDark.g + (colLight.g - colDark.g) * t) | 0;
+    lutB[i] = (colDark.b + (colLight.b - colDark.b) * t) | 0;
+  }
+}
+
+/** Two-value LUT for checkerboard (index 0 = dark, LUT_SIZE/2 = light). */
+function precomputeLUT_Checker() {
+  const HALF = LUT_SIZE >> 1;
+  for (let i = 0; i < HALF; i++) {
+    lutR[i] = colDark.r;  lutG[i] = colDark.g;  lutB[i] = colDark.b;
+  }
+  for (let i = HALF; i < LUT_SIZE; i++) {
+    lutR[i] = colLight.r; lutG[i] = colLight.g; lutB[i] = colLight.b;
+  }
+}
+
+/**
+ * baseIdx for radial pattern — CMF-weighted cumulative phase.
+ * No global offset needed; pattern is static.
+ */
+function precomputeBaseIdx_Radial() {
+  const cx = width * 0.5, cy = height * 0.5;
+  const radiusPx = Math.ceil(Math.sqrt(cx * cx + cy * cy));
+  const R_deg = radiusPx / pixelsPerDegree;
+  const dDeg  = 1.0 / pixelsPerDegree;
+  const cmf_R = 1.0 / (0.1 * R_deg + 1.0);
+  const denom = 1.0 - cmf_R;
+  const useCMF = denom > 1e-9;
+  let phiCycles = 0.0;
+
+  const phiIdxByR = new Uint16Array(radiusPx + 1);
+  _phiIdxByR = phiIdxByR; _phiIdxByR_n = radiusPx + 1;
+  for (let r = 0; r <= radiusPx; r++) {
+    const r_deg = r / pixelsPerDegree;
+    let f_r;
+    if (useCMF) {
+      const cmf = 1.0 / (0.1 * r_deg + 1.0);
+      f_r = cent_freq + (per_freq - cent_freq) * (1.0 - cmf) / denom;
+    } else { f_r = cent_freq; }
+    if (r > 0) phiCycles += f_r * dDeg;
+    phiIdxByR[r] = ((phiCycles - Math.floor(phiCycles)) * LUT_SIZE) & LUT_MASK;
+  }
+
+  baseIdx = new Uint16Array(width * height);
+  for (let y = 0; y < height; y++) {
+    const dy = y - cy;
+    for (let x = 0; x < width; x++) {
+      /* Math.sqrt is correctly rounded, Math.hypot is not: for a Pythagorean
+         offset such as (360, 319) hypot returns 480.999999999999943, which
+         floors into the wrong annulus. The squared offsets are exact here. */
+      const ddx = x - cx;
+      const r = Math.min(radiusPx, Math.floor(Math.sqrt(ddx * ddx + dy * dy)));
+      baseIdx[y * width + x] = phiIdxByR[r];
+    }
+  }
+}
+
+/**
+ * baseIdx for checkerboard — corners of four quadrants meet at centre.
+ * Even parity → 0 (dark), odd parity → LUT_SIZE/2 (light).
+ */
+function precomputeBaseIdx_Checker() {
+  const cx = width * 0.5, cy = height * 0.5;
+  const checkPx = checkSize_deg * pixelsPerDegree;
+  const HALF = LUT_SIZE >> 1;
+  baseIdx = new Uint16Array(width * height);
+  for (let y = 0; y < height; y++) {
+    const iy = Math.floor((y - cy) / checkPx);
+    for (let x = 0; x < width; x++) {
+      const ix = Math.floor((x - cx) / checkPx);
+      baseIdx[y * width + x] = ((ix & 1) ^ (iy & 1)) ? HALF : 0;
+    }
+  }
+}
+
+function buildPattern() {
+  if (patternType === 'checker') {
+    precomputeLUT_Checker();
+    precomputeBaseIdx_Checker();
+  } else {
+    precomputeBaseIdx_Radial();
+    if (gammaCalibration) {
+      buildGammaCorrectedLUT(Math.PI * 2);
+      applyGammaDCCorrection(baseIdx);
+    } else {
+      precomputeLUT_Radial();
+    }
+  }
+}
+
+function prepareImageBuffer() {
+  ctx2d   = drawingContext;
+  imgData = ctx2d.createImageData(width, height);
+  imgBuf  = imgData.data;
+}
+
+function prepareDotMask() {
+  const half = (dotSize / 2) | 0;
+  const x0 = Math.max(0, dotPos.x - half), y0 = Math.max(0, dotPos.y - half);
+  const x1 = Math.min(width - 1, dotPos.x + half - 1), y1 = Math.min(height - 1, dotPos.y + half - 1);
+  dotPixels = new Int32Array((x1 - x0 + 1) * (y1 - y0 + 1));
+  let k = 0;
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++)
+      dotPixels[k++] = (y * width + x) * 4;
+}
+
+function prepareCrossMask() {
+  const armPx = Math.round(fixationRadiusDeg * pixelsPerDegree);
+  const halfT = Math.floor(fixationThicknessPx / 2);
+  const cx = Math.round(width * 0.5), cy = Math.round(height * 0.5);
+  const offsets = [];
+  for (let d = -armPx; d <= armPx; d++) {
+    for (let t = -halfT; t < fixationThicknessPx - halfT; t++) {
+      const hx = cx + d, hy = cy + t;
+      if (hx >= 0 && hx < width && hy >= 0 && hy < height) offsets.push((hy * width + hx) * 4);
+      const vx = cx + t, vy = cy + d;
+      if (vx >= 0 && vx < width && vy >= 0 && vy < height) offsets.push((vy * width + vx) * 4);
+    }
+  }
+  crossPixels = new Int32Array([...new Set(offsets)]);
+}
+
+function prepareMasks() {
+  const cx = width * 0.5, cy = height * 0.5, ppd = pixelsPerDegree;
+  const cRad2  = maskCentral    ? (maskCentralRad_deg    * ppd) ** 2 : -1;
+  const pRad2  = maskPeripheral ? (maskPeripheralRad_deg * ppd) ** 2 : -1;
+  const q1Rad2 = maskQ1 ? (maskQ1Rad_deg * ppd) ** 2 : -1;
+  const q2Rad2 = maskQ2 ? (maskQ2Rad_deg * ppd) ** 2 : -1;
+  const q3Rad2 = maskQ3 ? (maskQ3Rad_deg * ppd) ** 2 : -1;
+  const q4Rad2 = maskQ4 ? (maskQ4Rad_deg * ppd) ** 2 : -1;
+  const any = maskCentral || maskPeripheral || maskQ1 || maskQ2 || maskQ3 || maskQ4;
+  const cB = [], pB = [], q1B = [], q2B = [], q3B = [], q4B = [];
+  if (any) {
+    for (let y = 0; y < height; y++) {
+      const dy = y - cy, dy2 = dy * dy;
+      for (let x = 0; x < width; x++) {
+        const dx = x - cx, r2 = dx * dx + dy2, j = (y * width + x) * 4;
+        if (maskCentral    && r2 <= cRad2)  cB.push(j);
+        if (maskPeripheral && r2 >  pRad2)  pB.push(j);
+        if (dx >= 0 && dy <= 0 && maskQ1 && r2 <= q1Rad2) q1B.push(j);
+        if (dx <  0 && dy <= 0 && maskQ2 && r2 <= q2Rad2) q2B.push(j);
+        if (dx <  0 && dy >  0 && maskQ3 && r2 <= q3Rad2) q3B.push(j);
+        if (dx >= 0 && dy >  0 && maskQ4 && r2 <= q4Rad2) q4B.push(j);
+      }
+    }
+  }
+  maskCentralPx    = maskCentral    ? new Int32Array(cB)  : null;
+  maskPeripheralPx = maskPeripheral ? new Int32Array(pB)  : null;
+  maskQ1Px = maskQ1 ? new Int32Array(q1B) : null;
+  maskQ2Px = maskQ2 ? new Int32Array(q2B) : null;
+  maskQ3Px = maskQ3 ? new Int32Array(q3B) : null;
+  maskQ4Px = maskQ4 ? new Int32Array(q4B) : null;
+}
+
+function applyMask(pxArray) {
+  const buf = imgBuf, n = pxArray.length;
+  const mR = colMask.r, mG = colMask.g, mB = colMask.b;
+  for (let k = 0; k < n; k++) {
+    const j = pxArray[k]; buf[j] = mR; buf[j+1] = mG; buf[j+2] = mB;
+  }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Rendering
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * blitPattern — render the pattern into imgBuf, apply masks, fixation, sync dot.
+ * Called every frame during the ON phase.
+ */
+function blitPattern() {
+  const base = baseIdx, mask = LUT_MASK, buf = imgBuf, N = width * height;
+  const offset = currentPhaseOffset;
+  for (let p = 0, j = 0; p < N; p++, j += 4) {
+    const idx = (base[p] + offset) & mask;
+    buf[j] = lutR[idx]; buf[j+1] = lutG[idx]; buf[j+2] = lutB[idx]; buf[j+3] = 255;
+  }
+  if (maskCentralPx)    applyMask(maskCentralPx);
+  if (maskPeripheralPx) applyMask(maskPeripheralPx);
+  if (maskQ1Px) applyMask(maskQ1Px);
+  if (maskQ2Px) applyMask(maskQ2Px);
+  if (maskQ3Px) applyMask(maskQ3Px);
+  if (maskQ4Px) applyMask(maskQ4Px);
+  applyFixationAndDot();
+  ctx2d.putImageData(imgData, 0, 0);
+}
+
+/**
+ * blitBlank — render a uniform blank screen, keeping fixation and sync dot.
+ * Called every frame during the OFF phase and during DELAY.
+ */
+function blitBlank() {
+  const buf = imgBuf, N = width * height;
+  const bR = colBlank.r, bG = colBlank.g, bB = colBlank.b;
+  for (let p = 0, j = 0; p < N; p++, j += 4) {
+    buf[j] = bR; buf[j+1] = bG; buf[j+2] = bB; buf[j+3] = 255;
+  }
+  applyFixationAndDot();
+  ctx2d.putImageData(imgData, 0, 0);
+}
+
+/** Write fixation cross and sync dot into imgBuf (shared by both blit functions). */
+function applyFixationAndDot() {
+  const buf = imgBuf;
+  if (showFixation && crossPixels) {
+    const crPx = crossPixels, nCr = crPx.length;
+    const fR = colFixation.r, fG = colFixation.g, fB = colFixation.b;
+    for (let k = 0; k < nCr; k++) {
+      const j = crPx[k]; buf[j] = fR; buf[j+1] = fG; buf[j+2] = fB;
+    }
+  }
+  const dotPx = dotPixels, nDot = dotPx.length;
+  /* Black between triggers; the trigger colour while a sync event lasts. */
+  const dotOn = dotFlashFrames > 0;
+  const dR = dotOn ? colSync.r : 0, dG = dotOn ? colSync.g : 0, dB = dotOn ? colSync.b : 0;
+  for (let k = 0; k < nDot; k++) {
+    const j = dotPx[k]; buf[j] = dR; buf[j+1] = dG; buf[j+2] = dB;
+  }
+  if (dotFlashFrames > 0) dotFlashFrames--;
+}
+
+/**
+ * renderFrame — per-frame paint dispatcher used by draw().
+ *   patternOn === true  → draw the onset pattern (ON phase)
+ *   patternOn === false → draw the uniform blank field (OFF / DELAY / MEASURE)
+ */
+function renderFrame(patternOn) {
+  if (useWebGL && glRenderer.active) {
+    const dotOn = dotFlashFrames > 0;
+    if (dotFlashFrames > 0) dotFlashFrames--;     // mirror applyFixationAndDot()
+    glRenderer.render(currentPhaseOffset, dotOn, patternOn);
+  } else {
+    if (patternOn) blitPattern();
+    else           blitBlank();
+  }
+}
+
+/* ── WebGL parity self-check + session enable ─────────────────────────────
+   Renders one representative frame both ways (WebGL vs the Canvas2D
+   reference) and compares pixel-by-pixel, so the GPU path is used only when
+   it matches within tolerance; otherwise the session falls back to Canvas2D. */
+function _glParityCheck(tol) {
+  tol = (tol == null) ? 2 : tol;
+  if (!glRenderer.active) return { passed:false, reason:'WebGL inactive' };
+  const W = width, H = height;
+  const savedDot = dotFlashFrames; dotFlashFrames = 0;
+  blitPattern();                                  // Canvas2D reference (pattern ON), dot off
+  const ref = Uint8ClampedArray.from(imgBuf);
+  dotFlashFrames = savedDot;
+  glRenderer.render(currentPhaseOffset, false, true);
+  const gl = document.getElementById('glCanvas').getContext('webgl2');
+  const px = new Uint8Array(W * H * 4);
+  gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  let maxDiff = 0, over = 0, n = 0;
+  for (let y = 0; y < H; y++) {
+    const glRow = (H - 1 - y) * W * 4, c2Row = y * W * 4;
+    for (let x = 0; x < W; x++) {
+      const gi = glRow + x * 4, ci = c2Row + x * 4;
+      const d = Math.max(Math.abs(px[gi]-ref[ci]), Math.abs(px[gi+1]-ref[ci+1]), Math.abs(px[gi+2]-ref[ci+2]));
+      if (d > maxDiff) maxDiff = d;
+      if (d > tol) over++;
+      n++;
+    }
+  }
+  const pctOver = 100 * over / n;
+  const report = { passed: (maxDiff <= tol) || (pctOver < 0.05),
+                   maxDiff, pctOver:+pctOver.toFixed(4), tolerance:tol, pixels:n,
+                   pattern: (typeof patternType !== 'undefined' ? patternType : '?') };
+  window.__glParity = report;
+  return report;
+}
+function _glEnableForSession() {
+  useWebGL = false;
+  const glCv = document.getElementById('glCanvas');
+  const p5Cv = document.querySelector('canvas:not(#glCanvas):not(#pickerWheel)');
+  // The #overlay div in these files is not closed, so glCanvas ends up nested
+  // inside it and collapses to 0x0 while the overlay is display:none during a
+  // session. Re-parent it to <body> so it lays out full-viewport.
+  if (glCv && glCv.parentElement !== document.body) document.body.appendChild(glCv);
+  // WebGL is the default render path (parity-gated). Force Canvas2D with ?webgl=0.
+  if (glCv) glCv.style.display = 'none';
+  if (p5Cv) p5Cv.style.opacity = '';
+  if (urlParams.get('webgl') === '0') return;
+  try {
+    glCv.width = width; glCv.height = height;
+    if (!glRenderer.active) glRenderer.init(glCv);
+    glRenderer.uploadLUT(lutR, lutG, lutB);
+    if (_phiIdxByR && _phiIdxByR_n) glRenderer.uploadPhi(_phiIdxByR, _phiIdxByR_n);
+    glRenderer.updateSessionUniforms(width, height);
+    glRenderer.resize(width, height);
+    const par = _glParityCheck();
+    if (!par.passed) {
+      console.warn('WebGL parity failed (maxDiff=' + par.maxDiff + ', ' + par.pctOver +
+                   '% over tol) — using Canvas2D.', par);
+      throw new Error('parity');
+    }
+    useWebGL = true;
+    if (glCv) glCv.style.display = 'block';
+    if (p5Cv) p5Cv.style.opacity = '0';
+  } catch (e) {
+    useWebGL = false;
+    if (glCv) glCv.style.display = 'none';
+    if (p5Cv) p5Cv.style.opacity = '';
+  }
+}
+function _showParityReport(rep) {
+  console.log('[VEP parity]', rep);
+  let el = document.getElementById('parityReport');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'parityReport';
+    el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2147483600;'
+      + 'padding:.8em 1.2em;font:13px/1.5 monospace;color:#fff;white-space:pre-wrap;';
+    document.body.appendChild(el);
+  }
+  el.style.background = rep.passed ? 'rgba(20,110,60,.96)' : 'rgba(150,40,40,.96)';
+  el.textContent = 'WebGL parity — ' + (rep.passed ? 'PASS' : 'FAIL') + '\n'
+    + JSON.stringify(rep, null, 2);
+}
+function _runParitySelfTest() {
+  let rep;
+  try {
+    readParams();
+    loadGammaCalibration();
+    resizeCanvas(windowWidth, windowHeight);
+    sessionCanvasWidth_px = width; sessionCanvasHeight_px = height;
+    prepareImageBuffer(); buildPattern(); prepareDotMask(); prepareCrossMask(); prepareMasks();
+    const glCv = document.getElementById('glCanvas');
+    glCv.width = width; glCv.height = height;
+    if (!glRenderer.active) glRenderer.init(glCv);
+    glRenderer.uploadLUT(lutR, lutG, lutB);
+    if (_phiIdxByR && _phiIdxByR_n) glRenderer.uploadPhi(_phiIdxByR, _phiIdxByR_n);
+    glRenderer.updateSessionUniforms(width, height);
+    glRenderer.resize(width, height);
+    rep = _glParityCheck();
+  } catch (e) {
+    rep = { passed:false, reason:e.message };
+  }
+  rep.stimulus = 'pattern_onset';
+  _showParityReport(rep);
+  try {
+    const tgt = window.opener || (window.parent !== window ? window.parent : null);
+    if (tgt) tgt.postMessage({ type:'vep_parity', report: rep }, '*');
+  } catch (e) {}
+  return rep;
+}
+window._glParityCheck     = _glParityCheck;
+window._runParitySelfTest = _runParitySelfTest;
+window._glDebug = function () {
+  const info = { useWebGL: useWebGL,
+                 active: (typeof glRenderer!=='undefined' && glRenderer.active),
+                 devicePixelRatio: window.devicePixelRatio,
+                 inner: [window.innerWidth, window.innerHeight],
+                 bodyBg: getComputedStyle(document.body).backgroundColor };
+  const c = document.getElementById('glCanvas');
+  if (c) {
+    let center = null;
+    try { const g = c.getContext('webgl2'); const px = new Uint8Array(4);
+          g.readPixels(c.width >> 1, c.height >> 1, 1, 1, g.RGBA, g.UNSIGNED_BYTE, px);
+          center = [px[0], px[1], px[2], px[3]]; }
+    catch (e) { center = 'err:' + e.message; }
+    info.glCanvasCenterPixel = center;
+  }
+  info.canvases = [].map.call(document.querySelectorAll('canvas'), function (el) {
+    const r = el.getBoundingClientRect(); const cs = getComputedStyle(el);
+    return { id: el.id || null, cls: (el.className || null),
+             buffer: [el.width, el.height],
+             rect: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)],
+             display: cs.display, zIndex: cs.zIndex, opacity: cs.opacity, position: cs.position };
+  });
+  console.log(JSON.stringify(info, null, 2));
+  return info;
+};
+
+
+
+function setup() {
+  pixelDensity(1);
+  createCanvas(windowWidth, windowHeight);
+  noLoop();
+
+  /* Detect and report the renderer (Canvas 2D vs WebGL 2). */
+  _checkWebGLBackground().catch(function(e) {
+    const n = document.getElementById('rendererNote');
+    if (n) n.textContent = 'Renderer: Canvas 2D (WebGL check error)';
+  });
+
+  /* Show calibration status and the display refresh rate immediately on load,
+     rather than only after the first session. */
+  loadGammaCalibration();
+  if (!_isChild) {
+    updateCalibrationStatusEl('calibrationStatus');
+    _probeDisplayRefreshRate();
+    const _calInput = document.getElementById('calLoadInput');
+    if (_calInput) {
+      _calInput.addEventListener('change', function (ev) {
+        if (ev.target.files && ev.target.files[0]) loadCalibrationFromFile(ev.target.files[0]);
+      });
+    }
+    /* Built at click time so it reflects the form as it stands. */
+    const _gateLink = document.getElementById('gateBackLink');
+    if (_gateLink) _gateLink.addEventListener('click', function () {
+      try { this.href = buildGateBackURL(); } catch (e) {}
+    });
+    const _refreshEl = document.getElementById('displayRefreshHz');
+    if (_refreshEl) _refreshEl.addEventListener('input', updateRefreshMismatchNote);
+    const _applyBtn = document.getElementById('applyContrastBtn');
+    if (_applyBtn) _applyBtn.addEventListener('click', applyContrastToColours);
+    seedMeanLuminanceIfEmpty();
+    _matchBlankOnLoad();
+    updateContrastReadout();
+    try { updateURLPreview();    } catch (e) {}
+    try { buildAPADescription(); } catch (e) {}
+  }
+  /* Autostart replaces the panel with its confirmation screen. Done last, so
+     everything it reports — parameters, calibration, contrast — is already in
+     place. */
+  if (_isAutostart) _showAutostartScreen();
+
+  /* Keyboard controls (main window and stimulus window):
+       Space — pause / resume        Esc — stop / abort
+     Forwarded to the separate stimulus window when one is open. */
+  window.addEventListener('keydown', (e) => {
+    /* Don't hijack keys while the operator is typing in a settings field. */
+    const t = e.target;
+    const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' ||
+                         t.tagName === 'SELECT' || t.isContentEditable);
+
+    /* Pause / resume: Space (ignored while typing). */
+    if ((e.key === ' ' || e.code === 'Space') && !e.ctrlKey && !typing) {
+      e.preventDefault();
+      if (_childWin && !_childWin.closed) {
+        _toChild({ type: 'vep_pause_toggle' });
+      } else {
+        if (state === 'PAUSED')                           resumeSession();
+        else if (state !== 'INIT' && state !== 'MEASURE') pauseSession();
+      }
+    }
+
+    /* Stop: Escape or Ctrl+Space. Ctrl+Space is preferred in a fullscreen
+       stimulus window because — unlike Escape — the browser neither reserves it
+       to leave fullscreen nor uses it for text editing. */
+    /* Stop key: Ctrl+Space, and only that.
+       Escape used to stop as well, which sounds friendlier than it was. The
+       browser reserves Escape for leaving full-screen and does not deliver it
+       to the page at all while full-screen, so it stopped the run in some
+       situations and merely left full-screen in others — the operator could not
+       form a reliable habit. Escape still ends a full-screen run, but through
+       one route only: leaving full-screen mid-run is treated as an abort, which
+       is a single press with a single outcome. */
+    const ctrlSpace = (e.ctrlKey && (e.key === ' ' || e.code === 'Space'));
+    if (ctrlSpace) {
+      e.preventDefault();
+      if (_isChild) {
+        if (state === 'PAUSED') state = pausedState;
+        if (state !== 'INIT') abortStimulation(true);
+        return;
+      }
+      if (_childWin && !_childWin.closed) _toChild({ type: 'vep_stop' });
+      if (state === 'PAUSED') state = pausedState;
+      /* Guarded, as _runStop is: without this every further press after a run
+         has ended re-runs the abort and downloads the log again. */
+      if (state !== 'INIT') abortStimulation(true);
+      return;
+    }
+
+    /* Escape while presenting in a window rather than full-screen: nothing
+       happens, and reaching for it is the natural reflex. Say what to press
+       instead rather than leaving the operator to wonder. */
+    if ((e.key === 'Escape' || e.key === 'Esc') && !typing
+        && state !== 'INIT' && !document.fullscreenElement) {
+      _runControls.set(_runControls.state() || 'running',
+                       'Escape does nothing here \u2014 press Ctrl+Space to stop.');
+    }
+  });
+
+  if (urlParams.has('parity')) setTimeout(_runParitySelfTest, 500);
+}
+
+function startStimulation() {
+  /* Child mode: the "awaiting start signal" note must not linger over the
+     stimulus once a session is running. */
+  VEP.showChildWaiting(false);
+  if (_isChild) _toParent({ type: 'vep_measuring' });
+  sessionStart_ms  = Date.now();
+  sessionStart_iso = new Date(sessionStart_ms).toISOString();
+
+  /* Capture screen/display info at session start (async; resolves before
+     MEASURE ends so data is ready when downloadLog() is called).       */
+  _screenInfo = null;
+  getScreenInfo().catch(function() {});
+  trial = 0; logData = []; firstOnsetTime_perf = null; dotFlashFrames = 0;
+  currentPhaseOffset = 0;
+  measuredFPS = 0; measureSamples = [];
+
+  loadGammaCalibration();
+  updateCalibrationStatusEl('calibrationStatus');
+  /* window.innerWidth rather than p5's windowWidth: p5 refreshes its globals
+     from its own resize listener, which may not have run yet after a full-screen
+     transition. Reading the window directly cannot be a step behind. */
+  resizeCanvas(window.innerWidth, window.innerHeight);
+  sessionCanvasWidth_px  = width;
+  sessionCanvasHeight_px = height;
+  _reportGeometryToParent();   // canvas now sized for this session
+  prepareImageBuffer();
+  buildPattern();
+  prepareDotMask();
+  prepareCrossMask();
+  prepareMasks();
+
+  _glEnableForSession();
+  /* Sync note + APA to the real renderer (parity gate may have fallen back). */
+  _syncRendererReadout();
+
+  frameRate(999);
+  noCursor();
+  state = 'MEASURE';
+  _bgSafety.markFrame();
+  _bgSafety.start();
+  loop();
+}
+
+function beginTrial() {
+  trial++;
+  if (trial > nCycles) {
+    /* Don't end on the last trial's offset: an immediate end (and the FINISHED
+       overlay) can land within the EEG response to the final onset. Hold a
+       blank post-stimulus tail of startDelay ms first, mirroring the pre-run
+       delay, so the recording has a clean baseline before anything changes. */
+    if (startDelay > 0) {
+      state = 'TAIL'; stateStart = millis();
+      if (_isChild) _toParent({ type: 'vep_tail' });
+      else if (_runControls) _runControls.status('Post-stimulus baseline\u2026');
+    } else {
+      endSession();
+    }
+    return;
+  }
+  if (trial === 1) _announceRunning();
+  _reportProgress(trial, nCycles);
+  currentPhaseOffset = (alternatePattern && (trial % 2 === 0)) ? (LUT_SIZE >> 1) : 0;
+  state          = 'ON';
+  stateStart     = millis();
+  onFrameCount   = 0;
+  if (syncOnOnset) dotFlashFrames = syncDotFrames;
+  // Pre-push the log record. Timestamps are captured INSIDE the ON-state
+  // draw branch — onset after the first ON-frame blit (the first changed
+  // frame), offset after the first OFF-frame blit (the next changed frame).
+  // This makes endpoints symmetric and reflects the real visible-change
+  // interval rather than the latency between the state machine and rendering.
+  if (enableLogging) {
+    logData.push({
+      trial,
+      phase_inverted        : currentPhaseOffset !== 0,
+      on_duration_target_ms : onDuration,
+      off_duration_target_ms: offDuration,
+      onset_ms              : null,  // filled after first ON-frame blit
+      onset_perf_ms         : null,
+      offset_ms             : null,  // filled after first OFF-frame blit
+      offset_perf_ms        : null,
+      on_duration_real_ms   : null,  // real:    onsetPerf → offsetPerf
+      on_duration_frames    : null,  // count of rendered ON frames
+      on_duration_frames_ms : null,  // derived: frames × 1000/measuredFPS
+    });
+  }
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  sessionCanvasWidth_px  = width;
+  sessionCanvasHeight_px = height;
+  _reportGeometryToParent();   // canvas now sized for this session
+  if (state === 'INIT') return;
+  prepareImageBuffer();
+  buildPattern();
+  prepareDotMask();
+  prepareCrossMask();
+  prepareMasks();
+  if (useWebGL && glRenderer.active) {
+    glRenderer.resize(width, height);
+    if (_phiIdxByR && _phiIdxByR_n) glRenderer.uploadPhi(_phiIdxByR, _phiIdxByR_n);
+    glRenderer.updateSessionUniforms(width, height);
+  }
+}
+
+function draw() {
+  _bgSafety.markFrame();
+  if (state === 'INIT' || state === 'PAUSED') return;
+  const now = millis();
+
+  if (state === 'MEASURE') {
+    renderFrame(false);
+    if (frameCount > 1 && deltaTime > 0) measureSamples.push(deltaTime);
+    if (measureSamples.length >= MEASURE_FRAMES) {
+      const sorted = [...measureSamples].sort((a, b) => a - b);
+      measuredFPS = Math.round(1000 / sorted[Math.floor(sorted.length / 2)] * 10) / 10;
+      document.getElementById('fpsDisplay').textContent = measuredFPS.toFixed(1) + ' Hz';
+      try { updateRefreshMismatchNote(); } catch (e) {}
+      if (_isChild) _toParent({ type: 'vep_fps', fps: measuredFPS });
+
+      // Pre-compute target frame counts (Math.round → nearest frame to target).
+      onDurationFrames  = Math.max(1, Math.round(onDuration  * measuredFPS / 1000));
+      offDurationFrames = Math.max(1, Math.round(offDuration * measuredFPS / 1000));
+
+      if (startDelay > 0) { state = 'DELAY'; stateStart = millis(); }
+      else                { beginTrial(); }
+    }
+    return;
+  }
+
+  if (state === 'DELAY') {
+    renderFrame(false);
+    if (now - stateStart >= startDelay) beginTrial();
+    return;
+  }
+
+  if (state === 'ON') {
+    renderFrame(true);
+    onFrameCount++;
+
+    // Capture onset after blitting the first ON frame — the first changed
+    // frame relative to the preceding OFF/blank phase.
+    if (onFrameCount === 1 && enableLogging && logData.length) {
+      const now_perf = performance.now();
+      if (firstOnsetTime_perf === null) firstOnsetTime_perf = now_perf;
+      const rec = logData[logData.length - 1];
+      rec.onset_perf_ms = +now_perf.toFixed(3);
+      rec.onset_ms      = +(now_perf - firstOnsetTime_perf).toFixed(3);
+    }
+
+    // Frame-count termination: eliminates the +1-frame bias from render
+    // time that millis()-based termination introduces.
+    if (onFrameCount >= onDurationFrames) {
+      if (syncOnOffset) dotFlashFrames = syncDotFrames;
+      offFrameCount = 0;
+      state = 'OFF'; stateStart = now;
+    }
+    return;
+  }
+
+  if (state === 'OFF') {
+    renderFrame(false);
+    offFrameCount++;
+
+    // Capture offset after blitting the first OFF frame — the first
+    // non-changing frame (pattern has just disappeared).
+    if (enableLogging && logData.length) {
+      const rec = logData[logData.length - 1];
+      if (rec.offset_perf_ms === null && rec.onset_perf_ms !== null) {
+        const off_perf       = performance.now();
+        const framePeriod_ms = measuredFPS > 0 ? 1000 / measuredFPS : null;
+        rec.offset_perf_ms        = +off_perf.toFixed(3);
+        rec.offset_ms             = +(off_perf - firstOnsetTime_perf).toFixed(3);
+        rec.on_duration_real_ms   = +(off_perf - rec.onset_perf_ms).toFixed(3);
+        rec.on_duration_frames    = onFrameCount;
+        rec.on_duration_frames_ms = framePeriod_ms != null
+          ? +(onFrameCount * framePeriod_ms).toFixed(3)
+          : null;
+      }
+    }
+
+    // Frame-count termination for OFF phase.
+    if (offFrameCount >= offDurationFrames) beginTrial();
+    return;
+  }
+
+  /* ── TAIL: blank screen for startDelay ms after the last trial ── */
+  if (state === 'TAIL') {
+    renderFrame(false);
+    if (millis() - stateStart >= startDelay) endSession();
+    return;
+  }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Session control
+   ══════════════════════════════════════════════════════════════════════════ */
+function endSession() {
+  _bgSafety.stop();
+  _sessionCompleted = true;
+  useWebGL = false;
+  const _glCvE=document.getElementById('glCanvas');
+  const _p5cE=document.querySelector('canvas:not(#glCanvas):not(#pickerWheel)');
+  if(_glCvE) _glCvE.style.display='none';
+  if(_p5cE) _p5cE.style.opacity='';
+  VEP.showPauseNote(false);
+  noLoop(); state = 'INIT'; cursor();
+  if (_isChild) {
+    /* Child window: terminal FINISHED note; report completion to the parent
+       even when logging is off, so the parent re-enables Start. */
+    _rendererDecided = false;
+    VEP.showChildFinished('FINISHED');
+    if (enableLogging && logData.length) downloadLog();   // sends vep_done with the log
+    else _toParent({ type: 'vep_done', log: null });
+    return;
+  }
+  if (_isAutostart) {
+    /* An autostart run has no settings panel to return to — it is hidden — so
+       it ends the way a stopped one does: report what was saved, then close. */
+    let savedAs = null;
+    if (enableLogging && logData.length) savedAs = downloadLog();
+    _autostartFinish(savedAs);
+    return;
+  }
+  document.getElementById('overlay').style.display = 'flex';
+  if (enableLogging && logData.length) downloadLog();
+  _restoreMainWindow('Session complete \u2014 log saved.');
+}
+
+/* Return the settings (main) window to its pre-stimulation state. */
+function _restoreMainWindow(statusText) {
+  _rendererDecided = false; _childUseWebGL = null;
+  cursor();
+  const efb = document.getElementById('exitFsBtn');
+  if (efb) efb.style.display = 'none';
+  if (document.fullscreenElement && document.exitFullscreen) {
+    document.exitFullscreen().catch(() => {});
+  }
+  document.getElementById('overlay').style.display = 'flex';
+  if (_runControls) { _runControls.set('idle', statusText || 'Ready.'); _refreshRunControls(); }
+}
+
+function abortStimulation(download = false) {
+  noLoop(); state = 'INIT'; cursor(); _bgSafety.stop();
+  const _glCv=document.getElementById('glCanvas');
+  const _p5c=document.querySelector('canvas:not(#glCanvas):not(#pickerWheel)');
+  if(_glCv) _glCv.style.display='none';
+  if(_p5c) _p5c.style.opacity='';
+  useWebGL=false;
+  VEP.showPauseNote(false);
+  if(_isChild){
+    /* Stopped in the child: terminal note, not the "awaiting start" note. */
+    _rendererDecided = false;
+    VEP.showChildFinished('FINISHED');
+    _sessionCompleted=false;
+    if(typeof enableLogging!=='undefined'&&enableLogging&&
+       typeof logData!=='undefined'&&logData.length) downloadLog();
+    else _toParent({type:'vep_aborted',log:null});
+    return;
+  }
+  _sessionCompleted=false;
+  let _savedAs = null;
+  if(download&&typeof enableLogging!=='undefined'&&enableLogging&&
+     typeof logData!=='undefined'&&logData.length) _savedAs = downloadLog();
+  /* An autostart run that was stopped still has nowhere to return to — the
+     settings panel is hidden — so it closes down the same way a completed one
+     does, reporting what was saved. */
+  if (_isAutostart) { _autostartFinish(_savedAs); return; }
+  _restoreMainWindow('Stopped.');
+}
+
+/* One number for the whole suite: the files are only ever used together, so a
+   per-file version would say nothing useful. Bump it for any release. */
+const SUITE_VERSION = '1.2.0';
+
+/**
+ * Name a log after the session it records, so several runs in one folder tell
+ * themselves apart without being opened.
+ *
+ * The timestamp is the session's start, taken from the log itself rather than
+ * from the moment of saving: those differ by the length of the run, and a name
+ * that disagrees with session_start_iso inside the file is worse than no
+ * timestamp at all. Colons are not allowed in Windows filenames, hence the
+ * dashes. The session note follows when there is one, reduced to characters
+ * that survive every filesystem.
+ */
+function logFileName(logObj) {
+  const base = 'vep_onset';
+  let stamp = '';
+  const iso = logObj && logObj.session_start_iso;
+  if (iso) stamp = String(iso).replace(/\.\d+Z$/, '').replace(/:/g, '-');
+  let note = (logObj && logObj.note) ? String(logObj.note) : '';
+  note = note.trim()
+    .replace(/[^A-Za-z0-9._-]+/g, '-')   // anything else, including accents, becomes a dash
+    .replace(/[-._]{2,}/g, '-')          // no runs of separators left behind by the above
+    .replace(/^[-._]+|[-._]+$/g, '')
+    .slice(0, 40).replace(/[-._]+$/, '');
+  return [base, stamp, note].filter(Boolean).join('_') + '.json';
+}
+
+function downloadLog() {
+  const output = {
+    params: {
+      patternType, cent_freq, per_freq, checkSize_deg,
+      nCycles, onDuration, offDuration, startDelay, alternatePattern,
+      onDurationFrames, offDurationFrames, measuredFPS,   // frames actually delivered, not the panel's refresh rate
+ display_refresh_hz: declaredRefreshHz() || null,
+      colLight: rgbToHex(colLight), colDark: rgbToHex(colDark),
+      colBlank: rgbToHex(colBlank),
+      colFixation: rgbToHex(colFixation), colMask: rgbToHex(colMask),
+      enableLogging,
+      renderer : _sessionRenderer,
+      webgl_parity : (typeof window!=='undefined' && window.__glParity) ? window.__glParity : null,
+      pause_count: logData.filter(function(e){return e.event==='pause';}).length,
+      webgl_test : webglTestResult ? {passed:webglTestResult.passed, timing_60f_ms:webglTestResult.timing_60f_ms} : null,
+      screen_info: _screenInfo || null,
+    },
+    calibration: {
+      screen_width_px, screen_width_cm, view_distance_cm,
+      pixelsPerDegree    : +pixelsPerDegree.toFixed(2),
+      canvas_width_px    : sessionCanvasWidth_px,
+      canvas_height_px   : sessionCanvasHeight_px,
+      canvas_width_deg   : +(sessionCanvasWidth_px  / pixelsPerDegree).toFixed(2),
+      canvas_height_deg  : +(sessionCanvasHeight_px / pixelsPerDegree).toFixed(2),
+      fullscreen         : useFullscreen,
+    },
+    gamma: gammaCalibration ? {
+      model              : gammaCalibration.model,
+      L_max_cdm2         : gammaCalibration.L_max_cdm2,
+      L_min_cdm2         : gammaCalibration.L_min_cdm2,
+      calibration_date   : gammaCalibration.calibration_date,
+      cal_source         : gammaCalSource === 'file' ? (gammaCalFileName || 'file') : gammaCalSource,
+      dc_correction_cdm2 : +gammaDCShiftReported().toFixed(4),
+      /* Saturation caused by that correction: clipped LUT entries mean the
+         luminance waveform is no longer sinusoidal, so the pattern's
+         spatial-frequency content differs from the nominal value. */
+      dc_clip_black_frac : +gammaDCClipLow_frac.toFixed(4),
+      dc_clip_white_frac : +gammaDCClipHigh_frac.toFixed(4),
+      michelson_contrast : gammaMichelsonContrast() != null ? +gammaMichelsonContrast().toFixed(4) : null,
+      /* Estimated from the transfer function, not measured in this session.
+         Only reported when the calibration itself was measured. */
+      luminance_basis    : luminanceBasis(),
+      L_light_cdm2       : luminanceIsMeasured() ? +patternLuminances().L_light.toFixed(3) : null,
+      L_dark_cdm2        : luminanceIsMeasured() ? +patternLuminances().L_dark.toFixed(3)  : null,
+      L_mean_cdm2        : luminanceIsMeasured() ? +patternLuminances().L_mean.toFixed(3)  : null,
+    } : { model: 'srgb_assumed', cal_source: 'none', dc_correction_cdm2: 0,
+          michelson_contrast : gammaMichelsonContrast() != null ? +gammaMichelsonContrast().toFixed(4) : null,
+          luminance_basis: 'not_reported', L_light_cdm2: null, L_dark_cdm2: null, L_mean_cdm2: null },
+    sync: { dot_x: dotPos.x, dot_y: dotPos.y, dot_size: dotSize, colour: rgbToHex(colSync),
+            syncDotFrames, syncOnOnset, syncOnOffset },
+    fixation: {
+      showFixation,
+      radius_deg   : fixationRadiusDeg,
+      thickness_px : fixationThicknessPx,
+      colour       : rgbToHex(colFixation),
+    },
+    masks: {
+      central    : { enabled: maskCentral,    radius_deg: maskCentralRad_deg },
+      peripheral : { enabled: maskPeripheral, radius_deg: maskPeripheralRad_deg },
+      quadrants  : {
+        Q1_top_right   : { enabled: maskQ1, radius_deg: maskQ1Rad_deg },
+        Q2_top_left    : { enabled: maskQ2, radius_deg: maskQ2Rad_deg },
+        Q3_bottom_left : { enabled: maskQ3, radius_deg: maskQ3Rad_deg },
+        Q4_bottom_right: { enabled: maskQ4, radius_deg: maskQ4Rad_deg },
+      },
+      colour     : rgbToHex(colMask),
+    },
+    note             : userNote,
+    session_start_ms : sessionStart_ms,
+    session_start_iso: sessionStart_iso,
+    stimulus         : 'onset',
+    /* The link that reproduces this session.
+       The log records what the calibration was, not the measurements behind it,
+       so it cannot rebuild the stimulus on its own. This link can: it carries
+       every parameter and the calibration object entire, which makes the log a
+       self-contained record rather than a description of one. It states what
+       was asked for; what was achieved is in the fields around it. */
+    replication_url  : (function () {
+      try { return updateURLPreview(); } catch (e) { return window.location.href; }
+    })(),
+    suite_version    : SUITE_VERSION,
+    engine_version   : VEP.version,
+    trials           : logData,
+  };
+  if (_isChild) {
+    /* Child window: transmit the COMPLETE log object (metadata + trials) to the
+       parent, which saves it — rather than downloading from the child itself.
+       Must be the full `output`, not just the trial array: the parent needs the
+       gamma / mask / session metadata too. */
+    _toParent({
+      type: _sessionCompleted ? 'vep_done' : 'vep_aborted',
+      log : output,
+    });
+    return;
+  }
+
+  const blob = new Blob([JSON.stringify(output, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const name = logFileName(output);
+  a.href = url; a.download = name; a.click();
+  URL.revokeObjectURL(url);
+  return name;
+}
+
+
+/* ── Parent / child window communication ─────────────── */
+const VERT_SRC_GL = VEP.PATTERN_VERT;
+const FRAG_SRC_GL = VEP.PATTERN_FRAG;
+
+
+// ─── Background-safety guard ──────────────────────────────────────────────
+const _bgSafety = VEP.createWatchdog({
+  graceMs: 3500,   // cover the fullscreen transition + MEASURE warm-up (incl. Firefox hitches)
+  getState: function () { return (typeof state !== 'undefined') ? state : undefined; },
+  onAbort: function (reason) {
+    if (typeof state === 'undefined' || state === 'INIT' || state === 'PAUSED') return;
+    noLoop(); state = 'INIT'; cursor();
+    document.getElementById('overlay').style.display = 'flex';
+    const e = document.getElementById('bgWarn');
+    if (e) { e.textContent = reason; e.style.display = 'block'; }
+    if (typeof enableLogging !== 'undefined' && enableLogging &&
+        typeof logData !== 'undefined' && logData.length) downloadLog();
+  },
+  onClear: function () {
+    const e = document.getElementById('bgWarn');
+    if (e) e.style.display = 'none';
+  }
+})
+
+/* ── Parent / child window communication ───────────────────────────────── */
+const _isChild = window.opener !== null && /^vep_present_/.test(window.name);
+let _childWin        = null;
+let _childReady      = false;
+/* Canvas geometry reported by the child stimulus window ('vep_geometry').
+   The APA methods text must describe the surface the stimulus is actually
+   presented on, which is the child window whenever one is open.          */
+let _childCanvasW    = 0;
+let _childCanvasH    = 0;
+let _childFullscreen = false;
+/* The parent that most recently addressed this child. Falls back to the
+   original opener, so a shared stimulus window can be driven by whichever
+   settings page reused it even if window.opener still points elsewhere.   */
+let _activeParent    = (window.opener && !window.opener.closed) ? window.opener : null;
+
+/* Parent<->child link (shared window + handshake) — see vep_engine.js. State
+   stays here; the engine reaches it through these accessors. */
+const _childLink = VEP.childLink({
+  isChild: _isChild,
+  windowName: 'vep_present_onset',   // one presentation window per stimulus
+  getChildWin:     () => _childWin,   setChildWin:   (w) => { _childWin = w; },
+  getChildReady:   () => _childReady, setChildReady: (b) => { _childReady = b; },
+  getActiveParent: () => _activeParent,
+  buildURL: () => {
+    try { updateURLPreview(); } catch (e) { console.warn('URL build:', e); }
+    const el = document.getElementById('urlPreview');
+    return (el ? el.textContent.trim() : '') || window.location.href;
+  },
+  updateChildUI: _updateChildUI,
+  /* Child gone: drop its cached canvas geometry so the APA methods text
+     goes back to describing this window. */
+  onChildClosed: () => {
+    _childCanvasW = 0; _childCanvasH = 0; _childFullscreen = false;
+    _childFPS = { hz: 0, exact: false };   // its rate described that window, not this one
+    refreshFpsDisplay();
+    try { updateRefreshMismatchNote(); } catch (e) {}
+    try { buildAPADescription(); } catch (e) {}
+  }
+});
+const _toChild             = _childLink.toChild;
+const _toParent            = _childLink.toParent;
+const openStandaloneWindow = _childLink.openStandaloneWindow;
+let _sessionCompleted = false;
+let useWebGL         = false;
+let webglTestResult  = null;
+let _sessionRenderer = 'canvas2d';   /* renderer actually used this session (log) */
+let _rendererDecided = false;   /* true once a session's renderer is chosen */
+let _childUseWebGL   = null;    /* the child window's actual renderer, if known */
+let _screenInfo      = null;
+let pausedState      = null;
+let pauseTime        = 0;
+
+
+
+function _readFormAsObj() {
+  const obj = {};
+  document.querySelectorAll('#overlayInner input, #overlayInner select').forEach(function(el) {
+    if (!el.id) return;
+    /* File inputs are excluded deliberately. Their value is a read-only path
+       ("C:\fakepath\..."), and assigning it back on the receiving side throws
+       InvalidStateError, which would abort the whole vep_start handler and
+       leave the parent waiting on "starting...". The calibration reaches the
+       child through the URL, not through this form snapshot. */
+    if (el.type === 'file') return;
+    obj[el.id] = (el.type === 'checkbox' || el.type === 'radio') ? String(el.checked) : el.value;
+  });
+  return obj;
+}
+function _applyFormObj(obj) {
+  Object.entries(obj).forEach(function([k, v]) {
+    const el = document.getElementById(k);
+    if (!el) return;
+    if (el.type === 'file') return;   // assigning to a file input throws
+    if (el.type === 'checkbox' || el.type === 'radio') { el.checked = (v === 'true'); }
+    else                        el.value   = v;
+  });
+  // Fire change on grouped/toggle inputs so dependent UI (e.g. pattern-type,
+  // conditional fields) updates to match the applied values.
+  document.querySelectorAll('#overlayInner input[type=radio], #overlayInner select')
+    .forEach(function(el){ el.dispatchEvent(new Event('change')); });
+  document.querySelectorAll('.hex-input').forEach(function(el) {
+    el.dispatchEvent(new Event('change'));
+  });
+  readParams();
+}
+function _downloadLogData(logObj) {
+  if (!logObj) return;
+  const blob = new Blob([JSON.stringify(logObj, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = logFileName(logObj); a.click();
+  URL.revokeObjectURL(url);
+}
+/* Report the canvas this child is presenting on, so the parent's APA methods
+   text describes the stimulus window rather than the settings window.
+   Sent on ready, at session start (canvas sized, fullscreen applied) and on
+   resize, because each can change the presenting surface. */
+function _reportGeometryToParent() {
+  if (!_isChild) return;
+  const w = (typeof width  === 'number' && width  > 0) ? width  : window.innerWidth;
+  const h = (typeof height === 'number' && height > 0) ? height : window.innerHeight;
+  /* The screen this window is on travels with the geometry: the operator may be
+     presenting on a different display from the one these settings were typed on,
+     and the pixel size of the two need not match. */
+  _toParent({ type: 'vep_geometry', w: w, h: h,
+              fullscreen: !!document.fullscreenElement,
+              screenW: window.screen.width,
+              dpr: window.devicePixelRatio || 1 });
+}
+
+/**
+ * Refresh-rate estimate measured *here*, in the presentation window, and sent to
+ * the settings panel.
+ *
+ * The panel's own estimate describes the display the settings window is on,
+ * which is not the one the subject looks at whenever a second monitor is used —
+ * and the two often differ, 60 Hz against 120 Hz being the common case. Marked
+ * as a probe so the parent shows it without mistaking it for the exact rate
+ * measured at session start.
+ */
+let _probeBusy = false, _probeTimer = null;
+
+
+/**
+ * Watch for the display changing under this window.
+ *
+ * Moving the window to another monitor, or changing that monitor's resolution,
+ * alters both the geometry the parent needs and the refresh rate — and neither
+ * reliably raises an event we could listen for. Polling three numbers once a
+ * second costs nothing and is the only way to notice. The refresh-rate probe is
+ * skipped unless the window is idle, so it never competes with a running
+ * stimulus for frames.
+ */
+let _screenSig = '';
+
+
+/* Start a session in this (child) stimulus window.
+
+   Fullscreen has to be requested by the window that is going fullscreen, and
+   only from a user gesture in that window. The parent's click cannot reach
+   here: a postMessage carries no user activation, so requestFullscreen() from
+   this handler is normally rejected by the browser. We still attempt it (it
+   succeeds while this window holds a recent activation of its own), and if it
+   is refused we start windowed and say so, rather than silently ignoring the
+   fullscreen setting. VEP.armFullscreenGesture (armed when this window
+   announces readiness) lets the operator put it into fullscreen beforehand,
+   with a single click. */
+function _startInChild() {
+  /* Poll for fullscreen to settle (API, OS-maximize, or virtual desktop) before
+     starting, rather than checking once (which races and can silently stall).
+     If it never settles, report back so the parent can re-block. */
+  if (!useFullscreen) { startStimulation(); return; }
+
+  let tries = 0;
+  const maxTries = 20;            // ~1 s at 50 ms
+  (function waitForFS() {
+    if (VEP.isEffectivelyFullscreen()) { startStimulation(); return; }
+    if (++tries >= maxTries) {
+      _toParent({ type: 'vep_fullscreen_denied' });
+      const msg  = document.getElementById('childWaitingMsg');
+      const hint = document.getElementById('childWaitingHint');
+      if (msg)  msg.textContent  = 'Fullscreen needed';
+      if (hint) hint.textContent = 'Make this window fullscreen (click it or press F), then Start again';
+      VEP.showChildWaiting(true);
+      return;
+    }
+    setTimeout(waitForFS, 50);
+  })();
+}
+
+/* ── Unified run controls ────────────────────────────────────────────────
+   One Start / Pause / Stop panel drives whichever surface will present the
+   stimulus: the child window if one is open, otherwise this window. */
+let _runControls = null;
+
+function _childFullscreenWanted() { return _fullscreenWanted(); }
+
+/* Has this window already installed the click/F listeners? Arming twice would
+   stack duplicate handlers on every toggle. */
+let _fsGestureArmed = false;
+
+
+
+
+
+
+/* Which query parameter fills which field. At module scope because the
+   autostart screen validates the URL against it as well, and a copy of the list
+   in two places would drift the first time a parameter was added. */
+const GET_TO_FIELD_ID = {
+  cent_freq: 'cent_freq', per_freq: 'per_freq',
+  checkSize: 'checkSize', alternatePattern: 'alternatePattern',
+  onDuration: 'onDuration', offDuration: 'offDuration',
+  nCycles: 'nCycles', startDelay: 'startDelay',
+  screen_width_px: 'screen_width_px', screen_width_cm: 'screen_width_cm',
+  view_distance_cm: 'view_distance_cm',
+  displayRefreshHz: 'displayRefreshHz',
+  useFullscreen: 'useFullscreen', enableLogging: 'enableLogging',
+  dot_x: 'dot_x', dot_y: 'dot_y', syncDotFrames: 'syncDotFrames', dotSize: 'dotSize', hexSync1: 'hexSync1',
+  hexLight: 'hexLight', hexDark: 'hexDark', hexBlank: 'hexBlank',
+  hexFixation: 'hexFixation', hexMask: 'hexMask',
+  syncOnOnset: 'syncOnOnset', syncOnOffset: 'syncOnOffset',
+  showFixation: 'showFixation', fixationRadius: 'fixationRadius',
+  fixationThickness: 'fixationThickness',
+  maskCentral: 'maskCentral', maskCentralRad: 'maskCentralRad',
+  maskPeripheral: 'maskPeripheral', maskPeripheralRad: 'maskPeripheralRad',
+  maskQ1: 'maskQ1', maskQ1Rad: 'maskQ1Rad',
+  maskQ2: 'maskQ2', maskQ2Rad: 'maskQ2Rad',
+  maskQ3: 'maskQ3', maskQ3Rad: 'maskQ3Rad',
+  maskQ4: 'maskQ4', maskQ4Rad: 'maskQ4Rad',
+};
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Autostart: run from a link, without the settings panel
+   A stimulus opened with autostart=1 hides its controls and shows a
+   confirmation screen instead. That screen is not ceremony. Full-screen is only
+   granted in response to a gesture made in this window, so a click is required
+   whatever we do; since the operator has to click anyway, the click is worth
+   something — it is the one moment where a wrong figure can still be caught,
+   and hiding the panel removes every other.
+   ══════════════════════════════════════════════════════════════════════════ */
+const _isAutostart = !_isChild && paramBool('autostart', false);
+
+/** Query keys this page understands. Anything else is a typo, and in autostart
+    a typo is silent: the value falls back to a default that looks plausible in
+    the log. So they are refused rather than ignored. */
+function _knownParamKeys() {
+  /* Radio groups are addressed by name rather than by element id, so they are
+     absent from the field map and have to be listed here or a valid link would
+     be refused as a typo. */
+  return Object.keys(GET_TO_FIELD_ID).concat(['patternType']).concat(
+    ['autostart', 'cal', 'cal_name', 'note', 'webgl', 'parity', 'theme']);
+}
+
+function _autostartProblems() {
+  const problems0 = (typeof p5 === 'undefined')
+    ? ['The p5.js library did not load, so no stimulus can be drawn. This page '
+       + 'needs p5.min.js in the same folder; copy it there and reload.']
+    : [];
+  const known = _knownParamKeys(), bad = [];
+  urlParams.forEach(function (_v, k) { if (known.indexOf(k) < 0) bad.push(k); });
+  const problems = problems0.concat(bad.length
+    ? ['Unrecognized parameter' + (bad.length > 1 ? 's' : '') + ': ' + bad.join(', ')]
+    : []);
+  /* Name the offending fields. "One or more parameters are out of range" tells
+     the operator that something is wrong and nothing about what, which in a
+     window with no settings panel to inspect is close to useless. */
+  const form = document.getElementById('paramForm');
+  if (form && !form.checkValidity()) {
+    const names = [];
+    form.querySelectorAll('input, select').forEach(function (el) {
+      if (el.willValidate && !el.checkValidity()) names.push(el.id || el.name || '?');
+    });
+    problems.push(names.length
+      ? 'Out of range or missing: ' + names.join(', ')
+      : 'One or more parameters are out of range or missing.');
+  }
+  return problems;
+}
+
+/** The figures worth reading before a recording starts. */
+function _autostartSummary() {
+  const L = patternLuminances();
+  const rows = [
+    ['Stimulus', getPatternType() === 'checker' ? 'Checkerboard onset' : 'Radial onset'],
+    ['Trials', nCycles + ' \u00B7 on ' + onDuration + ' ms, off ' + offDuration + ' ms'],
+    ['Start delay / tail', (startDelay / 1000).toFixed(1) + ' s each'],
+    /* The canvas is not sized until the session starts, so the field is stated
+       from the window this will present in — which under autostart is this one. */
+    ['Field', (window.innerWidth / pixelsPerDegree).toFixed(1) + '\u00B0 \u00D7 '
+             + (window.innerHeight / pixelsPerDegree).toFixed(1)
+             + '\u00B0 at ' + pixelsPerDegree.toFixed(1) + ' px/deg'],
+    ['Contrast', L && L.contrast != null ? (L.contrast * 100).toFixed(1) + '%' : '\u2014'],
+    ['Calibration', gammaCalibration
+        ? (gammaCalibration.model + ' \u00B7 '
+           + (gammaCalSource === 'file' ? (gammaCalFileName || 'file') : 'from link'))
+        : 'none \u2014 sRGB assumed, no luminance reported'],
+    ['Logging', enableLogging ? 'on' + (userNote ? ' \u00B7 note: ' + userNote : '') : 'OFF'],
+  ];
+  if (declaredRefreshHz()) rows.push(['Display refresh', declaredRefreshHz() + ' Hz (entered)']);
+  return rows;
+}
+
+function _showAutostartScreen() {
+  /* Autostart presents full-screen unless the link says otherwise, and the
+     ordinary Start path is what performs the transition: it waits for the
+     browser to finish resizing before sizing the canvas and beginning. */
+  if (!urlParams.has('useFullscreen')) {
+    const fsEl = document.getElementById('useFullscreen');
+    if (fsEl) fsEl.checked = true;
+  }
+  readParams();
+  const problems = _autostartProblems();
+  const wrap = document.createElement('div');
+  wrap.id = 'autostartScreen';
+  wrap.setAttribute('style',
+    'position:fixed; inset:0; z-index:9999; display:flex; flex-direction:column;'
+    + 'align-items:center; justify-content:center; gap:1.2rem; padding:2rem;'
+    + 'background:#0f141b; color:#e6ecf4; font:16px/1.6 system-ui,-apple-system,sans-serif;'
+    + 'text-align:center;');
+  let html = '<div style="font-size:1.5rem; font-weight:600;">Pattern-Onset VEP \u2014 ready</div>';
+  html += '<table class="autostart-table" style="border-collapse:collapse;'
+        + 'font-size:.95rem; text-align:left;">';
+  _autostartSummary().forEach(function (r) {
+    html += '<tr><td style="padding:.2em 1.2em .2em 0; color:#8fa6bd;">' + r[0]
+          + '</td><td style="padding:.2em 0; color:#e6ecf4;">' + r[1] + '</td></tr>';
+  });
+  html += '</table>';
+  if (!enableLogging) problems.push('Logging is off \u2014 this run will leave no record.');
+  if (problems.length) {
+    html += '<div style="max-width:44rem; padding:.7em 1em; border-radius:.5em;'
+          + 'border:1px solid rgba(232,165,90,.45); background:rgba(232,165,90,.1);'
+          + 'color:#e8a55a; text-align:left;">' + problems.map(function (p) {
+              return '\u26A0 ' + p; }).join('<br>') + '</div>';
+  }
+  html += '<button id="autostartGo" type="button" style="font:inherit; font-size:1.1rem;'
+        + 'padding:.7em 2.4em; border-radius:.6em; border:1px solid #2c8f62;'
+        + 'background:#1f6e4a; color:#fff; cursor:pointer;">Start \u2014 click here</button>';
+  html += '<div style="max-width:34rem; font-size:.85em; color:#8fa6bd;">Clicking goes '
+        + 'full-screen and begins. <strong><kbd>Ctrl</kbd>+<kbd>Space</kbd> stops.</strong> '
+        + 'Escape leaves full-screen, which also ends the run.</div>';
+  wrap.innerHTML = html;
+  document.body.appendChild(wrap);
+  document.getElementById('autostartGo').addEventListener('click', function () {
+    wrap.remove();
+    /* This click is the user activation full-screen requires, and _runStart
+       calls requestFullscreen within the same gesture. Nothing may be deferred
+       to a timer in between or the browser withdraws the permission. */
+    _runStart();
+  });
+}
+
+
+function _runStart() {
+  const childOpen = !!(_childWin && !_childWin.closed);
+  if (childOpen) {
+    if (!_childReady || !_fullscreenGateOK()) { _refreshRunControls(); return; }
+    _toChild({ type: 'vep_start', params: _readFormAsObj(),
+               cal: gEncodeCalForURL(gammaCalibration),
+               cal_name: (gammaCalSource === 'file' ? gammaCalFileName : '') });
+    _runControls.set('measuring', 'Stimulus window: starting\u2026');
+    return;
+  }
+  readParams();
+  document.getElementById('overlay').style.display = 'none';
+  _runControls.set('measuring', 'Starting\u2026');
+  if (useFullscreen && document.documentElement.requestFullscreen) {
+    /* Enter full-screen first, and begin only once the transition has really
+       finished. A fixed delay is not enough: the promise resolves before the
+       viewport has settled, and the canvas would then be sized to the window as
+       it was beforehand — it ends up in the top-left corner at the old size,
+       with every visual angle wrong and nothing in the log to show it. */
+    let begun = false;
+    function beginOnce() {
+      if (begun) return;
+      begun = true;
+      document.removeEventListener('fullscreenchange', onFsReady);
+      requestAnimationFrame(function () { requestAnimationFrame(startStimulation); });
+    }
+    function onFsReady() { if (document.fullscreenElement) setTimeout(beginOnce, 60); }
+    document.addEventListener('fullscreenchange', onFsReady);
+    document.documentElement.requestFullscreen()
+      .then(function () { setTimeout(beginOnce, 500); })
+      .catch(function () { beginOnce(); });
+  } else {
+    startStimulation();
+  }
+}
+
+
+
+
+
+/* Live count of delivered trials, shown in the run status. */
+function _reportProgress(n, total) {
+  const msg = 'Running \u2014 trial ' + n + ' / ' + total + '.';
+  if (_isChild) { _toParent({ type: 'vep_progress', n: n, total: total }); return; }
+  if (_runControls && _runControls.state() === 'running') _runControls.status(msg);
+}
+
+if (_isChild) {
+  window.addEventListener('message', function(e) {
+    const d = e.data; if (!d || !d.type) return;
+    switch (d.type) {
+      case 'vep_fullscreen_pref':
+        _applyFullscreenPref(!!d.wanted);
+        _reportGeometryToParent();   // let the parent re-evaluate its Start gate
+        break;
+
+      case 'vep_start':
+        if ('cal' in d) _applyCalibrationFromParent(d.cal, d.cal_name);
+        if (d.params) _applyFormObj(d.params);
+        if (state === 'INIT') {
+          _startInChild();
+        } else {
+          _toParent({ type: 'vep_busy' });
+        }
+        break;
+      case 'vep_pause_toggle':
+        if      (state === 'PAUSED')                           resumeSession();
+        else if (state !== 'INIT' && state !== 'MEASURE')     pauseSession();
+        break;
+      case 'vep_stop':
+        if (state !== 'INIT') abortStimulation(false); break;
+      case 'vep_hello':
+        _activeParent = e.source || _activeParent;
+        if (_activeParent) _activeParent.postMessage({ type: 'vep_ready' }, '*');
+        break;
+    }
+  });
+}
+window.addEventListener('message', function(e) {
+  if (!_childWin || e.source !== _childWin) return;
+  const d = e.data; if (!d || !d.type) return;
+  switch (d.type) {
+    case 'vep_ready':
+      _childReady = true;
+      _refreshRunControls(); break;
+    case 'vep_fullscreen_denied':
+      _childFullscreen = false;
+      _runControls.set('blocked',
+        'Fullscreen is required. Click the stimulus window (or press F) to make it '
+        + 'fullscreen, then Start.');
+      break;
+    case 'vep_geometry':
+      _childCanvasW    = d.w | 0;
+      _childCanvasH    = d.h | 0;
+      _childFullscreen = !!d.fullscreen;
+      _childScreenW    = d.screenW ? (d.screenW | 0) : 0;
+      try { updateScreenScopeNote(); } catch (e) {}
+      try { buildAPADescription(); } catch (e) {}
+      _refreshRunControls();
+      break;
+    case 'vep_fps':
+      /* The stimulus window's rate: exact when measured at its session start,
+         an estimate (probe) when sent while idle. Kept apart from this
+         window's own measuredFPS — see presentationFPS(). */
+      if (typeof d.fps === 'number' && d.fps > 0) _childFPS = { hz: d.fps, exact: !d.probe };
+      refreshFpsDisplay();
+      try { updateRefreshMismatchNote(); } catch (e) {}
+      try { buildAPADescription(); } catch (e) {}
+      if (!d.probe && typeof d.fps === 'number' && d.fps > 0)
+        _runControls.set('measuring', 'Stimulus window: measuring… ('
+          + d.fps.toFixed(1) + ' Hz)');
+      break;
+    case 'vep_measuring':
+      _runControls.set('measuring', 'Stimulus window: measuring\u2026'); break;
+    case 'vep_tail':
+      _runControls.status('Stimulus window: post-stimulus baseline\u2026'); break;
+    case 'vep_running':
+      if (typeof d.webgl === 'boolean') {
+        _childUseWebGL = d.webgl; _rendererDecided = true;
+        const note = document.getElementById('rendererNote');
+        if (note) note.textContent = 'Renderer (stimulus window): '
+          + (d.webgl ? 'WebGL\u00a02 \u2713' : 'Canvas 2D');
+        try { buildAPADescription(); } catch (e) {}
+      }
+      _runControls.set('running', 'Stimulus window: running.'); break;
+    case 'vep_progress':
+      if (_runControls.state() === 'running' || _runControls.state() === 'measuring')
+        _runControls.set('running', 'Stimulus window: running \u2014 trial '
+          + d.n + ' / ' + d.total + '.');
+      break;
+    case 'vep_busy':
+      _runControls.set('idle', 'Stimulus window busy \u2014 try Start again.');
+      _refreshRunControls(); break;
+    case 'vep_paused':
+      _runControls.set('paused', 'Stimulus window: paused.'); break;
+    case 'vep_resumed':
+      _runControls.set('running', 'Stimulus window: running.'); break;
+    case 'vep_done':
+      _rendererDecided = false; _childUseWebGL = null;
+      _runControls.set('idle', 'Stimulus window: session complete \u2014 log saved.');
+      _refreshRunControls();
+      if (d.log) _downloadLogData(d.log); break;
+    case 'vep_aborted':
+      _rendererDecided = false; _childUseWebGL = null;
+      _runControls.set('idle', 'Stimulus window: stopped'
+        + (d.log ? ' \u2014 partial log saved.' : '.'));
+      _refreshRunControls();
+      if (d.log && ((d.log.trials && d.log.trials.length) ||
+                    (d.log.flashes && d.log.flashes.length))) _downloadLogData(d.log); break;
+  }
+});
+
+/* ── Standalone window ──────────────────────────────────────────────────── */
+
+
+
+
+async function getScreenInfo() {
+  const sx = window.screenX ?? window.screenLeft ?? 0;
+  const sy = window.screenY ?? window.screenTop  ?? 0;
+  const pw = window.screen.width, ph = window.screen.height;
+  const info = {
+    primary_screen_px  : { w: pw, h: ph },
+    device_pixel_ratio : window.devicePixelRatio || 1,
+    window_position    : { x: sx, y: sy },
+    window_inner_px    : { w: window.innerWidth, h: window.innerHeight },
+    is_standalone_popup: window.opener !== null,
+    likely_secondary   : sx >= pw || sx < 0 || sy >= ph || sy < 0,
+    wm_api_available   : false,
+    current_screen     : null,
+  };
+  if ('getScreenDetails' in window) {
+    try {
+      const sd = await window.getScreenDetails();
+      const cs = sd.currentScreen;
+      info.wm_api_available = true;
+      info.current_screen = { label: cs.label||null, width: cs.width,
+        height: cs.height, avail_width: cs.availWidth, avail_height: cs.availHeight,
+        device_pixel_ratio: cs.devicePixelRatio, is_primary: cs.isPrimary,
+        left: cs.left, top: cs.top };
+    } catch (_) {}
+  }
+  _screenInfo = info; return info;
+}
+
+/* ── Pause / resume ─────────────────────────────────────────────────────── */
+function _drawPauseOverlay() {
+  /* Paints the PAUSED indicator directly onto the stimulation canvas so it is
+     part of the rendered frame (guaranteed visible, mode-independent). In
+     WebGL mode the GL canvas is on top, so we rely on the DOM #pauseNote there. */
+  if (useWebGL) return;
+  const ctx = (typeof ctx2d !== 'undefined' && ctx2d) ? ctx2d : (drawingContext || null);
+  if (!ctx) return;
+  const cx = width / 2, cy = height / 2;
+  const bw = Math.min(width * 0.55, 560), bh = Math.min(height * 0.26, 180);
+  ctx.save();
+  ctx.fillStyle = 'rgba(10,20,35,0.9)';
+  const x = cx - bw/2, y = cy - bh/2, r = 12;
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.arcTo(x+bw,y,x+bw,y+bh,r); ctx.arcTo(x+bw,y+bh,x,y+bh,r);
+  ctx.arcTo(x,y+bh,x,y,r); ctx.arcTo(x,y,x+bw,y,r); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(123,200,232,0.35)'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = '#eef2f8'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = '600 ' + Math.round(bh*0.26) + 'px system-ui, sans-serif';
+  ctx.fillText('\u275a\u275a  PAUSED', cx, cy - bh*0.12);
+  ctx.fillStyle = 'rgba(238,242,248,0.75)';
+  ctx.font = Math.round(bh*0.13) + 'px system-ui, sans-serif';
+  ctx.fillText('Press Space to resume', cx, cy + bh*0.22);
+  ctx.restore();
+}
+function pauseSession() {
+  pausedState = state; pauseTime = millis(); state = 'PAUSED'; noLoop();
+  VEP.showPauseNote(true);
+  _drawPauseOverlay();
+  if (typeof enableLogging !== 'undefined' && enableLogging) {
+    logData.push({ event:'pause', session_elapsed_ms: Date.now()-(sessionStart_ms||Date.now()),
+                   timestamp_iso: new Date().toISOString() });
+  }
+  if (_isChild) _toParent({ type: 'vep_paused' });
+  else if (_runControls) _runControls.set('paused', 'Paused in this window.');
+}
+function resumeSession() {
+  const dur = millis() - pauseTime;
+  stateStart += dur;
+  state = pausedState; pausedState = null;
+  VEP.showPauseNote(false);
+  if (typeof enableLogging !== 'undefined' && enableLogging) {
+    logData.push({ event:'resume', pause_duration_ms: +dur.toFixed(1),
+                   timestamp_iso: new Date().toISOString() });
+  }
+  if (_isChild) _toParent({ type: 'vep_resumed' });
+  else if (_runControls) _runControls.set('running', 'Running in this window.');
+  _bgSafety.markFrame(); _bgSafety.start(); loop();
+}
+
+async function _checkWebGLBackground() {
+  const note=document.getElementById('rendererNote');
+  const setNote=msg=>{ if(note) note.textContent='Renderer: '+msg; };
+  setNote('detecting…');
+  const tmp=document.createElement('canvas');
+  if(!tmp.getContext('webgl2')){ setNote('Canvas 2D (WebGL 2 unavailable)'); return; }
+  const glCv=document.getElementById('glCanvas');
+  glCv.width=windowWidth; glCv.height=windowHeight;
+  try { glRenderer.init(glCv); } catch(e) { setNote('Canvas 2D (shader error)'); webglTestResult={passed:false,reason:e.message}; return; }
+    const dR=new Uint8ClampedArray(1024),dG=new Uint8ClampedArray(1024),dB=new Uint8ClampedArray(1024);
+  for(let i=0;i<1024;i++) dR[i]=dG[i]=dB[i]=(i*255/1024)|0;
+  glRenderer.uploadLUT(dR,dG,dB);
+  glRenderer.uploadPhi(new Uint16Array(256),256);
+  glRenderer.updateSessionUniforms(glCv.width, glCv.height);
+  const t0=performance.now();
+  for (let f=0;f<60;f++) glRenderer.render(f*16, false, true);
+  glCv.getContext('webgl2').finish();
+  const dt=+(performance.now()-t0).toFixed(1);
+  webglTestResult={passed:true,timing_60f_ms:dt};
+  /* Report the renderer that will actually drive the stimulus, not merely
+     that WebGL is available: if it is disabled (?webgl=0) the session uses
+     Canvas 2D, so the note must match the APA methods text. */
+  if (_effectiveWebGL()) {
+  setNote('WebGL 2 ✓  (60-frame: '+dt+' ms)');
+  } else {
+    setNote('Canvas 2D (WebGL 2 available but disabled; 60-frame: '+dt+' ms)');
+  }
+}
+
+const glRenderer = VEP.createPatternRenderer({
+  vertSrc: VERT_SRC_GL,
+  fragSrc: FRAG_SRC_GL,
+  getUniforms: () => ({
+    pixelsPerDegree: pixelsPerDegree,
+    dotSize: dotSize, dotPos: dotPos, dotColour: colSync,
+    maskCentral: maskCentral, maskCentralRad_deg: maskCentralRad_deg,
+    maskPeripheral: maskPeripheral, maskPeripheralRad_deg: maskPeripheralRad_deg,
+    maskQ1: maskQ1, maskQ1Rad_deg: maskQ1Rad_deg, maskQ2: maskQ2, maskQ2Rad_deg: maskQ2Rad_deg,
+    maskQ3: maskQ3, maskQ3Rad_deg: maskQ3Rad_deg, maskQ4: maskQ4, maskQ4Rad_deg: maskQ4Rad_deg,
+    colMask: colMask, showFixation: showFixation, fixationRadiusDeg: fixationRadiusDeg,
+    fixationThicknessPx: fixationThicknessPx, colFixation: colFixation,
+    patternType:  (typeof patternType   !== 'undefined') ? patternType   : null,
+    checkSize_deg:(typeof checkSize_deg  !== 'undefined') ? checkSize_deg : 1,
+    colLight:     (typeof colLight       !== 'undefined') ? colLight      : null,
+    colDark:      (typeof colDark        !== 'undefined') ? colDark       : null,
+    colBlank:     (typeof colBlank       !== 'undefined') ? colBlank      : null
+  }),
+  onContextLost: () => {
+    if (typeof state !== 'undefined' && state !== 'INIT') {
+      if (typeof logData !== 'undefined' && logData.length) {
+        const last = logData[logData.length-1];
+        if (last.offset_perf_ms === null || last.onset_perf_ms === null) last.webgl_context_loss_truncated = true;
+        logData.push({ event:'webgl_context_loss', timestamp_iso:new Date().toISOString() });
+      }
+      noLoop(); state='INIT'; cursor();
+      const ov=document.getElementById('overlay'); if (ov && !_isChild) ov.style.display='flex';
+      const warn=document.getElementById('bgWarn');
+      if (warn){ warn.textContent='\u26a0\ufe0f WebGL context lost \u2014 session aborted.'; warn.style.display='block'; }
+      useWebGL=false;
+      if (typeof enableLogging!=='undefined' && enableLogging && typeof logData!=='undefined' && logData.length) downloadLog();
+    }
+  },
+  updateBadge: _updateBadge
+});
+/* ── Light / dark theme toggle ── */
+(function () {
+  var KEY  = 'vep_theme';
+  var SUN  = '\u2600';  // ☀  shown in dark mode (click to go light)
+  var MOON = '\u25D7';  // ◗  shown in light mode (click to go dark)
+
+  function applyTheme(t) {
+    document.documentElement.setAttribute('data-theme', t || 'dark');
+    var btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.textContent = (t === 'light') ? MOON : SUN;
+  }
+
+  /* The bootstrap in <head> has already resolved the theme; follow it rather
+     than reading the store again, which would undo a theme passed in the URL. */
+  applyTheme(document.documentElement.getAttribute('data-theme') || 'dark');
+
+  document.addEventListener('DOMContentLoaded', function () {
+    applyTheme(document.documentElement.getAttribute('data-theme') || 'dark');
+    var btn = document.getElementById('themeToggleBtn');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+        try { localStorage.setItem(KEY, next); } catch (e) {}
+        applyTheme(next);
+      });
+    }
+
+    /* Hand the theme to the next page of the suite. The href is rewritten on
+       the way out, so links the page rebuilds at runtime are covered too. */
+    document.addEventListener('click', function (e) {
+      var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+      if (!a) return;
+      var href = a.getAttribute('href') || '';
+      if (!href || href.charAt(0) === '#') return;
+      var u;
+      try { u = new URL(a.href, location.href); } catch (err) { return; }
+      if (u.protocol !== location.protocol || !/\.html$/i.test(u.pathname)) return;
+      u.searchParams.set('theme', document.documentElement.getAttribute('data-theme') || 'dark');
+      a.href = u.toString();
+    }, true);
+  });
+})();
+
+</script>
+
+<!-- Colour picker popup -->
+<div id="colorPicker">
+  <canvas id="pickerWheel" width="160" height="160"></canvas>
+  <input id="pickerSlider" type="range" min="0" max="100" value="50">
+  <div id="pickerPreview"></div>
+  <button id="pickerClose">OK</button>
+</div>
+
+
+<canvas id="glCanvas"></canvas>
+
+<div id="childWaiting" style="display:none; position:fixed; top:50%; left:50%;
+     transform:translate(-50%,-50%); background:rgba(10,20,35,.88); color:#eef2f8;
+     padding:1.1em 2.4em; border-radius:.55em; font-size:1.35em; font-family:inherit;
+     text-align:center; border:1px solid rgba(123,200,232,.28); z-index:50;
+     cursor:pointer; line-height:1.5;">
+  <span id="childWaitingMsg">Awaiting start signal</span>
+  <div id="childWaitingHint" style="font-size:.52em; color:#7bc8e8; margin-top:.4em; font-weight:400;">
+    Click here (or press <kbd style="background:rgba(255,255,255,.14); padding:.1em .4em;
+    border-radius:.2em; font-family:inherit;">F</kbd>) for fullscreen
+  </div>
+</div>
+
+<div id="pauseNote" style="display:none; position:fixed; top:50%; left:50%;
+     transform:translate(-50%,-50%); background:rgba(10,20,35,.88); color:#eef2f8;
+     padding:1.1em 2.4em; border-radius:.55em; font-size:1.35em; font-family:inherit;
+     text-align:center; border:1px solid rgba(123,200,232,.28); z-index:2147483000;
+     pointer-events:none; line-height:1.5;">
+  &#9646;&#9646;&ensp;PAUSED
+  <div style="font-size:.52em; color:#7bc8e8; margin-top:.4em; font-weight:400;">
+    Press <kbd style="background:rgba(255,255,255,.14); padding:.1em .4em;
+    border-radius:.2em; font-family:inherit;">Space</kbd> to resume
+  </div>
+</div>
+
+</body>
+</html>

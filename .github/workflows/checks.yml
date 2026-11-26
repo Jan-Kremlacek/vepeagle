@@ -1,0 +1,45 @@
+# Static checks and the headless-browser battery, on every push and pull request.
+# The browser tests run Chromium with SwiftShader, so WebGL 2 is available
+# without a GPU; they do not replace a session on the real display.
+name: checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: |
+          npm ci --prefix tests
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Static checks (syntax, markup, constants, lint)
+        run: bash tests/check.sh
+
+      - name: Engine unit tests
+        run: node tests/test_engine.js
+
+      - name: Browser battery
+        run: |
+          python tests/test_gate.py
+          python tests/test_stim.py
+          python tests/test_oddball.py
+          python tests/test_oddball2.py
+          python tests/test_misc.py
+          python tests/test_pixels.py

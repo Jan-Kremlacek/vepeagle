@@ -1,0 +1,3022 @@
+<!DOCTYPE html>
+<!--
+  VEPeagle — User Manual
+  ================================
+  Author : Jan Kremlacek
+  Version: 1.2.0
+  License: MIT
+
+  Companion documentation for the five-file VEP stimulus suite:
+    vep_gate.html              — shared-parameter launcher
+    flash_vep.html             — full-field luminance flash
+    pattern_reversal_vep.html  — checkerboard / radial reversal
+    pattern_onset_vep.html     — checkerboard / radial onset
+    motion_onset_vep.html      — radial CMF-weighted motion onset
+
+  Open this file in any modern browser. All sections are reachable from the
+  table of contents on the left; expandable <details> blocks contain
+  derivations, edge cases, and worked examples.
+-->
+<html lang="en" class="page-manual">
+<head>
+  <meta charset="UTF-8" />
+  <script>(function(){
+    /* Theme, in order of precedence: the ?theme= parameter another page of the
+       suite passed on, the choice stored here, the system preference. Over
+       file:// the store is per-page, so the parameter is the only way across. */
+    var q = new URLSearchParams(location.search).get('theme');
+    var t = (q === 'light' || q === 'dark') ? q : null;
+    try { t = t || localStorage.getItem('vep_theme'); } catch (e) {}
+    if (!t && window.matchMedia)
+      t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', t || 'dark');
+    if (q === 'light' || q === 'dark') { try { localStorage.setItem('vep_theme', q); } catch (e) {} }
+  })()</script>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNCIgZmlsbD0iIzBkMGQwZCIvPgogIDxyZWN0IHg9IjciIHk9IjMiIHdpZHRoPSIxOCIgaGVpZ2h0PSIyNiIgcng9IjIiIGZpbGw9IiMxZTFlMWUiIHN0cm9rZT0iIzU1NSIgc3Ryb2tlLXdpZHRoPSIxIi8+CiAgPHJlY3QgeD0iMTAiIHk9IjciICB3aWR0aD0iMTIiIGhlaWdodD0iMi41IiByeD0iMSIgZmlsbD0iI2ZmZiIvPgogIDxyZWN0IHg9IjEwIiB5PSIxMiIgd2lkdGg9IjEyIiBoZWlnaHQ9IjEuOCIgcng9IjEiIGZpbGw9IiM4ODgiLz4KICA8cmVjdCB4PSIxMCIgeT0iMTUuNSIgd2lkdGg9IjkiIGhlaWdodD0iMS44IiByeD0iMSIgZmlsbD0iIzg4OCIvPgogIDxyZWN0IHg9IjEwIiB5PSIxOSIgd2lkdGg9IjExIiBoZWlnaHQ9IjEuOCIgcng9IjEiIGZpbGw9IiM2NjYiLz4KICA8cmVjdCB4PSIxMCIgeT0iMjIuNSIgd2lkdGg9IjciIGhlaWdodD0iMS44IiByeD0iMSIgZmlsbD0iIzY2NiIvPgo8L3N2Zz4=">
+  <title>VEPeagle — Manual</title>
+  <link rel="stylesheet" href="vep.css">
+</head>
+<body>
+<button id="themeToggleBtn" title="Switch light/dark theme" aria-label="Toggle light/dark theme" style="
+  position:fixed; top:.9em; right:1em;
+  width:2em; height:2em; border-radius:50%;
+  padding:0; box-sizing:border-box;
+  border:1px solid rgba(123,200,232,.28);
+  background:rgba(0,0,0,.22); color:#7bc8e8;
+  cursor:pointer; font-size:1.05em; z-index:999;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .18s;
+">&#9728;</button>
+
+
+<div class="layout">
+
+  <!-- ════════════════════════ SIDEBAR ════════════════════════ -->
+  <aside class="sidebar">
+    <h1>VEPeagle</h1>
+    <div class="sub">Manual · suite v1.2.0</div>
+
+    <nav>
+      <h2>Start here</h2>
+      <a href="#overview">What this suite is</a>
+      <a href="#files">The files and what each does</a>
+      <a href="#quickstart">Quick start</a>
+      <a href="#quickmod">Changing a stimulus</a>
+      <a href="#installation">Installation &amp; requirements</a>
+
+      <h2>Running a session</h2>
+      <a href="#workflow">Recommended workflow</a>
+      <a href="#gate">Using the gate page</a>
+      <a href="vep_gate.html" target="vep_gate" class="indent">&#x2197; Open VEP Gate</a>
+      <a href="#autostart" class="indent">Autostart (Run)</a>
+      <a href="#runpanel">Run panel and the stimulus window</a>
+
+      <h2>Display geometry</h2>
+      <a href="#screen">Screen calibration</a>
+      <a href="#angle">Visual angle calculations</a>
+      <a href="#framerate">Frame rate measurement</a>
+
+      <h2>Luminance &amp; contrast</h2>
+      <a href="#calibration">Luminance calibration</a>
+      <a href="display_calibration.html" target="vep_calibration" class="indent">&#x2197; Open calibration page</a>
+      <a href="#gamma-lut" class="indent">Gamma linearization</a>
+      <a href="#contrast">Contrast and photometry</a>
+
+      <h2>Pattern generation</h2>
+      <a href="#checker">Checkerboard pattern</a>
+      <a href="#radial">Radial sinusoidal grating</a>
+      <a href="#cmf">CMF weighting</a>
+      <a href="#lut">LUT phase mechanism</a>
+
+      <h2>Common features</h2>
+      <a href="#fixation">Fixation cross</a>
+      <a href="#masking">Masking</a>
+      <a href="#sync">Synchronization</a>
+
+      <h2>Stimulus pages</h2>
+      <a href="#flash">Flash VEP</a>
+      <a href="flash_vep.html" target="vep_settings_flash" class="indent">&#x2197; flash_vep.html</a>
+      <a href="#reversal">Pattern Reversal VEP</a>
+      <a href="pattern_reversal_vep.html" target="vep_settings_reversal" class="indent">&#x2197; pattern_reversal_vep.html</a>
+      <a href="#onset">Pattern Onset VEP</a>
+      <a href="pattern_onset_vep.html" target="vep_settings_onset" class="indent">&#x2197; pattern_onset_vep.html</a>
+      <a href="#motion">Motion Onset VEP</a>
+      <a href="motion_onset_vep.html" target="vep_settings_motion" class="indent">&#x2197; motion_onset_vep.html</a>
+      <a href="#oddball">Oddball VEP</a>
+      <a href="oddball_vep.html" target="vep_settings_oddball" class="indent">&#x2197; oddball_vep.html</a>
+
+      <h2>Output</h2>
+      <a href="#log">Log file format</a>
+      <a href="vep_log_analyzer.html" target="vep_analyzer">↗ Log analyzer (separate tool)</a>
+      <a href="#apa">APA description</a>
+
+      <h2>Reference</h2>
+      <a href="#urlparams">URL parameters</a>
+      <a href="#troubleshooting">Troubleshooting</a>
+      <a href="#appendix">Appendix</a>
+      <a href="#checklist" class="indent">Session checklist</a>
+      <a href="#protocol" class="indent">Window protocol</a>
+      <a href="#limits" class="indent">What is and is not verified</a>
+      <a href="#citation">Citation &amp; license</a>
+    </nav>
+  </aside>
+
+  <!-- ════════════════════════ CONTENT ════════════════════════ -->
+  <main>
+
+    <h1>VEPeagle — Manual</h1>
+    <p class="page-subtitle">Reference documentation for VEPeagle (gate + five stimuli)</p>
+
+    <!-- ════════════════════════ OVERVIEW ════════════════════════ -->
+    <section id="overview">
+      <h2>What this suite is</h2>
+
+      <p>
+        Four stimulus pages for the canonical visual-evoked-potential responses — flash,
+        pattern reversal, pattern onset and motion onset — and an oddball page for
+        responses to rare stimuli, plus the tools they need around them. Everything runs in a browser from a folder on disk. There is no installation,
+        no build step, no server and no network connection.
+      </p>
+
+      <p>
+        The name runs VEP and <em>eagle</em> together. The eagle is the Orlice — Czech
+        for a female eagle, and the river that joins the Elbe at Hradec Králové,
+        where the suite was written.
+      </p>
+
+      <p>Four ideas shape how it works, and knowing them makes the rest predictable.</p>
+
+      <ul>
+        <li><strong>Each stimulus page is self-sufficient.</strong> It can be opened on its
+          own, configured, and run. The gate page is a convenience that fills the shared
+          parameters in for you, not a component the stimuli depend on.</li>
+        <li><strong>Parameters live in the URL.</strong> Whatever you set is reflected in the
+          link the page shows you. Copy that link and you have the condition: it reopens
+          identically, on this machine or another, and it can go into a protocol or a
+          bookmark. This is also how the gate hands settings over.</li>
+        <li><strong>The calibration is a file.</strong> A <code>.json</code> written by the
+          calibration page. It travels in the URL and is named in the log, so a recording can
+          always be traced back to the display state it was made under. Browser storage is
+          only ever a shortcut.</li>
+        <li><strong>The log is the record.</strong> Every event carries a timestamp from
+          <code>performance.now()</code>, alongside the full parameter set,
+          the calibration in force and which renderer drew the frames. The APA paragraph each
+          page produces is written from the same values.</li>
+      </ul>
+    </section>
+
+    <!-- ════════════════════════ FILES ════════════════════════ -->
+    <section id="files">
+      <h2>The files and what each does</h2>
+
+      <p>
+        Keep them all in one folder. Every page loads <code>vep.css</code> from beside
+        it; the gate and the calibration page also load <code>vep_engine.js</code>, and
+        the five stimuli load <code>vep_engine.js</code>, <code>vep_page.js</code> and
+        <code>p5.min.js</code>.
+      </p>
+
+      <table>
+        <thead>
+          <tr><th>File</th><th>What it is for</th><th>Needed?</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>vep_engine.js</code></td>
+              <td>Shared code: run control, the child-window protocol, pattern rendering,
+                  the luminance and contrast maths.</td>
+              <td>Required by the gate, the calibration page and all five stimuli</td></tr>
+          <tr><td><code>vep_page.js</code></td>
+              <td>Page machinery the five stimulus pages share verbatim: run controls,
+                  full-screen handling, refresh-rate probing, color pairs, the copyable
+                  link and report.</td>
+              <td>Required by all five stimuli</td></tr>
+          <tr><td><code>vep.css</code></td>
+              <td>Every style in the suite: the color palette for the light and dark
+                  themes, the rules the pages share, then one section per page, scoped by
+                  a class on that page's <code>&lt;html&gt;</code> element.</td>
+              <td>Required by every page</td></tr>
+          <tr><td><a href="vep_gate.html" target="vep_gate"><code>vep_gate.html</code></a></td>
+              <td>Launcher. Holds the parameters common to all stimuli and the
+                  calibration, and builds the links that carry them.</td>
+              <td>Recommended</td></tr>
+          <tr><td><a href="display_calibration.html" target="vep_calibration"><code>display_calibration.html</code></a></td>
+              <td>Measures the display's luminance response and writes the calibration
+                  <code>.json</code>.</td>
+              <td>Required for any luminance or contrast figure</td></tr>
+          <tr><td><a href="flash_vep.html" target="vep_settings_flash"><code>flash_vep.html</code></a></td>
+              <td>Full-field luminance flash.</td><td rowspan="5">At least the one you record</td></tr>
+          <tr><td><a href="pattern_reversal_vep.html" target="vep_settings_reversal"><code>pattern_reversal_vep.html</code></a></td>
+              <td>Checkerboard or radial pattern reversal.</td></tr>
+          <tr><td><a href="pattern_onset_vep.html" target="vep_settings_onset"><code>pattern_onset_vep.html</code></a></td>
+              <td>Checkerboard or radial pattern onset / offset.</td></tr>
+          <tr><td><a href="motion_onset_vep.html" target="vep_settings_motion"><code>motion_onset_vep.html</code></a></td>
+              <td>Radial CMF-weighted motion onset.</td></tr>
+          <tr><td><a href="oddball_vep.html" target="vep_settings_oddball"><code>oddball_vep.html</code></a></td>
+              <td>Oddball paradigm: shapes (X, O, + or SVG) in a seeded pseudorandom order.</td></tr>
+          <tr><td><a href="vep_log_analyzer.html" target="vep_analyzer"><code>vep_log_analyzer.html</code></a></td>
+              <td>Reads a saved log and reports timing accuracy, the session's settings and
+                  an APA paragraph.</td>
+              <td>Optional, after recording</td></tr>
+          <tr><td><a href="webgl_parity_test.html" target="vep_parity_test"><code>webgl_parity_test.html</code></a></td>
+              <td>Checks that the GPU shader draws the same frame as the CPU reference for
+                  your configuration.</td>
+              <td>Optional, once per setup</td></tr>
+          <tr><td><code>manual.html</code></td><td>This document.</td><td>Optional</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ════════════════════════ QUICK START ════════════════════════ -->
+    <section id="quickstart">
+      <h2>Quick start</h2>
+
+      <p>The shortest path from a folder of files to a recording.</p>
+
+      <ol>
+        <li>Open <a href="display_calibration.html" target="vep_calibration"><code>display_calibration.html</code></a>,
+          measure the display, and press <em>Open gate with this calibration</em>. The gate
+          opens with the calibration already loaded. (Skipping this is allowed — the stimuli
+          then assume sRGB and work in relative units, and no luminance is reported.)</li>
+        <li>In the gate, set the screen width in pixels and centimeters, the viewing
+          distance and the sync dot. The gate remembers them.</li>
+        <li>Press the launch button for the stimulus you want. It opens with everything
+          filled in.</li>
+        <li>Set the stimulus-specific parameters: frequency, duration, number of trials,
+          pattern type, colors, fixation cross and masks.</li>
+        <li>Tick <em>Save log</em> and type a session note if you want a record.</li>
+        <li>Press <em>↗ New window</em> to put the stimulus on the presentation screen, tick
+          <em>Fullscreen</em>, and click once in that window (or press <kbd>F</kbd>).</li>
+        <li>Press <em>Start</em>. A short frame-rate measurement runs first, then the
+          pre-stimulus delay, then the stimulation, then a post-stimulus baseline of the same
+          length as the delay.</li>
+        <li><kbd>Ctrl</kbd>+<kbd>Space</kbd> stops at any point. In full-screen,
+          <kbd>Esc</kbd> leaves full-screen, which also ends the run and saves the log.</li>
+      </ol>
+
+      <div class="note">
+        <strong>The link is the condition.</strong> Copy the reproducible link the stimulus
+        page shows you and keep it with the protocol. It holds every parameter and the
+        calibration in one line, and reopening it reproduces the setting exactly.
+      </div>
+    </section>
+
+    <!-- ════════════════════════ QUICK MODIFICATION ════════════════════════ -->
+    <section id="quickmod">
+      <h2>Changing a stimulus</h2>
+
+      <p>
+        Every field on a stimulus page takes effect the moment you change it, and the
+        reproducible link below the form updates with it. Nothing needs saving and nothing needs reloading.
+      </p>
+
+      <ul>
+        <li><strong>Set a contrast rather than colors.</strong> Type a Michelson contrast in
+          percent and a mean luminance, then press <em>Apply to colors</em>. The colors are
+          computed for you and stay editable afterwards — see
+          <a href="#contrast">Contrast and photometry</a>.</li>
+        <li><strong>Reuse a condition.</strong> Copy the URL. Bookmarks and protocol lines
+          both work; the calibration travels with it.</li>
+        <li><strong>Change the calibration for one page only.</strong> Load a
+          <code>.json</code> on the stimulus page itself; it overrides whatever the link
+          carried, and the new link carries the new one.</li>
+        <li><strong>Force the CPU renderer.</strong> Add <code>&amp;webgl=0</code> to the URL.
+          The renderer actually used is recorded in the log either way.</li>
+      </ul>
+    </section>
+
+    <!-- ════════════════════════ INSTALLATION ════════════════════════ -->
+    <section id="installation">
+      <h2>Installation &amp; requirements</h2>
+
+      <p>
+        Put every file listed above in one directory and double-click
+        <a href="vep_gate.html" target="vep_gate"><code>vep_gate.html</code></a>, or any stimulus
+        page directly. No build step, package manager or local server is required.
+      </p>
+
+      <p>
+        The shared files have to sit beside the pages: every page loads
+        <code>vep.css</code>, the gate and the calibration page load
+        <code>vep_engine.js</code>, and the five stimuli load <code>vep_engine.js</code>,
+        <code>vep_page.js</code> and <code>p5.min.js</code>. A missing file is reported
+        rather than failing quietly: the gate says so in its calibration status line, and a
+        stimulus page names the file in its status line and keeps Start disabled. Without
+        <code>vep.css</code> the pages still load, but unstyled; put it back before
+        recording.
+      </p>
+
+      <h3>Browser requirements</h3>
+      <ul>
+        <li>Any current Chromium-based browser (Chrome, Edge, Brave) or Firefox.</li>
+        <li>Hardware-accelerated rendering enabled (default).</li>
+        <li>A display refresh rate stable enough for your timing tolerance — typically
+          60–144 Hz LCD or higher. The actual rate is measured at session start
+          (<a href="#framerate">see below</a>).</li>
+      </ul>
+
+      <details>
+        <summary>file:// vs. http:// — does it matter?</summary>
+        <p>
+          For the stimulus, no — every page runs the same from the local file system
+          or from a web server, with <code>requestAnimationFrame</code>,
+          <code>performance.now()</code>, fullscreen and the clipboard available in
+          both, and links work as bookmarks either way.
+        </p>
+        <p>
+          What differs is browser storage. Over <code>file://</code> each file keeps its
+          own, so one page cannot read what another stored. That is why everything a
+          page needs from another — the parameters, the calibration, even the light or
+          dark theme — travels in the link rather than in storage, and why the suite
+          behaves the same whichever way it is opened. Served over
+          <code>http://</code> (for example <code>python -m http.server</code>), the
+          pages share one store, which only means that remembered conveniences such as
+          the last calibration are shared too.
+        </p>
+      </details>
+
+      <h3>Hardware recommendations</h3>
+      <ul>
+        <li><strong>Display:</strong> CRT or low-latency LCD. Avoid TVs with motion smoothing.</li>
+        <li><strong>Photodiode:</strong> Affixed to the screen at the synchronization dot
+          location (configurable; default top-left, 32 px × 32 px). The dot shows its trigger
+          color (white by default) during a sync event and is black otherwise, so the
+          photodiode signal is a clean step. With an RGB photodiode, choose a primary color
+          for the dot; see <a href="#sync">Synchronization</a>.</li>
+        <li><strong>Viewing distance and screen width:</strong> Both must be measured
+          physically and entered on the gate or stimulus page; the pixel-per-degree value is
+          derived from these numbers.</li>
+      </ul>
+
+      <div class="warn">
+        <strong>The colors in the form are code values, not measured light.</strong> What
+        the light, dark, flash, blank, fixation and mask colors actually produce on screen
+        depends on the monitor's gamma, brightness and contrast settings and on any color
+        management profile. For a published study, measure the display on the calibration
+        page and report the resulting cd/m² — see
+        <a href="#calibration">Luminance calibration</a>.
+      </div>
+    </section>
+
+    <!-- ════════════════════════ WORKFLOW ════════════════════════ -->
+    <section id="workflow">
+      <h2>Recommended workflow</h2>
+
+      <ol>
+        <li><strong>Calibrate the display</strong> — on the first session, and after any
+          change of monitor, brightness or profile. Open
+          <a href="display_calibration.html" target="vep_calibration"><code>display_calibration.html</code></a>,
+          choose a model (sRGB to get going, Measured for anything you intend to publish) and
+          for the measured model step through the guided photometer sequence. Download the
+          <code>.json</code> — that file is the record of the display state and belongs with
+          the recording. Then press <em>Open gate with this calibration</em>.</li>
+        <li><strong>Set the shared parameters</strong> in the gate: screen geometry and
+          viewing distance, sync dot, and the session note.</li>
+        <li><strong>Launch a stimulus</strong> from the gate. It opens in a new tab with those
+          parameters and the calibration already in place.</li>
+        <li><strong>Set the stimulus-specific parameters</strong>: timing, pattern type, check
+          size or spatial frequency, fixation cross and masks, and the colors — either
+          directly or by asking for a contrast and a mean luminance. To keep the result as a
+          condition, copy the <em>Reproducible link</em> below the form and add it in
+          the gate.</li>
+        <li><strong>Tick <em>Save log</em></strong> and fill in the session note if you want a
+          JSON record. The note can still be typed while a run is in progress.</li>
+        <li><strong>Put the stimulus where the subject will see it.</strong> Press
+          <em>↗ New window</em> and move that window to the presentation screen. With
+          <em>Fullscreen</em> ticked, <em>Start</em> stays locked until that window really is
+          full-screen — one click in it, or <kbd>F</kbd>, is enough.</li>
+        <li><strong>Press <em>Start</em>.</strong> A frame-rate measurement runs first, then
+          the pre-stimulus delay, the stimulation itself, and finally a post-stimulus baseline
+          of the same length as the delay. The stimulus window shows FINISHED when it is
+          over.</li>
+        <li><strong>Copy the APA paragraph</strong> from <em>APA-style report</em> below the
+          form; a click copies it. It describes the parameters, the calibration and the
+          renderer that were actually used.</li>
+      </ol>
+
+      <p>
+        The reproducible link is also a preset: bookmarked or added to the protocol, it
+        reopens the condition exactly as it was (see <a href="#quickstart">Quick start</a>).
+      </p>
+    </section>
+
+    <!-- ════════════════════════ GATE PAGE ════════════════════════ -->
+    <section id="gate">
+      <h2>Using the gate page</h2>
+
+      <p>
+        The gate page (<a href="vep_gate.html" target="vep_gate"><code>vep_gate.html</code></a>)
+        is the recommended starting point. It holds two things: the <strong>conditions</strong>
+        of an examination, in order, and the <strong>environment</strong> they run in — the
+        screen, the room, the synchronization patch and the display calibration. Every
+        condition launched from the gate gets the gate's environment; what the stimulus
+        <em>is</em> stays with the condition.
+      </p>
+
+      <div class="note">
+        <strong>The dividing line.</strong> The gate owns the screen width in pixels and
+        centimeters, the viewing distance, the display refresh rate, the sync dot (position,
+        size, on-time, color), <em>Fullscreen</em>, <em>Save log</em>, the session note and the
+        calibration. Everything else — pattern, colors, contrast, timing, fixation cross,
+        masks — belongs to the stimulus page and is stored with the condition. Fixation and
+        masks are deliberately not in the gate: a central mask changes which part of the
+        retina is stimulated, so it is part of the stimulus and may differ between the
+        conditions of one protocol.
+      </div>
+
+      <h3>Sections</h3>
+      <ul>
+        <li><strong>Session</strong> — the session note written into every log, and the
+          <em>Fullscreen</em> and <em>Save log</em> switches applied to every condition.</li>
+        <li><strong>Conditions</strong> — the protocol. Each row has <em>Run</em>,
+          <em>Page</em>, <em>↻</em>, <em>↑</em> and <em>✕</em>; see below.</li>
+        <li><strong>Protocol file</strong> — download the protocol as <code>.json</code>, load
+          one, or clear the list.</li>
+        <li><strong>Screen &amp; room</strong> — width in px and cm, viewing distance, and the
+          display refresh rate. Collapsed, with the values shown in its header.</li>
+        <li><strong>Display calibration</strong> — the calibration in force, with its type,
+          age and where it came from.</li>
+        <li><strong>Synchronization</strong> — sync dot position, size, on-time and the
+          trigger color of each stimulus. Collapsed,
+          with the values shown in its header.</li>
+        <li><strong>Open a stimulus page</strong> — launch tiles for building a new
+          condition.</li>
+      </ul>
+
+      <h3>Conditions</h3>
+      <table>
+        <thead><tr><th>Control</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td><em>Run</em></td><td>Opens the condition in autostart mode, with the gate's environment substituted. See <a href="#autostart">Autostart</a>.</td></tr>
+          <tr><td><em>Page</em></td><td>Opens the condition's stimulus page with the same parameters, to check or edit them.</td></tr>
+          <tr><td><em>↻</em></td><td>Updates the condition from a link copied on the stimulus page after editing it.</td></tr>
+          <tr><td><em>↑</em> · <em>✕</em></td><td>Moves the condition up; removes it.</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        To add a condition, configure it on its stimulus page, copy the link the page shows,
+        and paste it under <em>Add a condition</em>. Only the stimulus part of the link is
+        stored. The environment is supplied by the gate every time the condition is launched,
+        so changing the viewing distance or the calibration here changes every condition at
+        once.
+      </p>
+
+      <div class="warn">
+        <strong>When a link disagrees with the gate.</strong> A link copied from a stimulus page
+        also carries that page's screen and sync values. If you changed one of them there — a
+        larger sync dot, say — the gate notices when you add the link or update a condition
+        with <em>↻</em>, lists the differences, and asks which to keep: <em>OK</em> takes the
+        link's values into the gate (and so into every condition), <em>Cancel</em> keeps the
+        gate's. Nothing is dropped without that question.
+      </div>
+
+      <h3>What the gate remembers</h3>
+      <p>
+        The screen, room and synchronization settings and the two switches are remembered in
+        this browser, so the gate reopens as you left it. The session note is not remembered:
+        it names a subject, and carrying it into the next session would label someone else's
+        recording. The last calibration you gave the gate is remembered too.
+      </p>
+      <p>
+        Following the <em>VEP Gate</em> link at the bottom of a stimulus page hands that page's
+        screen and sync values back to the gate. If they differ from what the gate had, a
+        notice lists the changes, with <em>Undo</em> to go back.
+      </p>
+      <p>
+        The protocol file records the environment beside the conditions, so the file alone
+        documents how the study was run. Loading it offers those settings rather than imposing
+        them, because the same protocol is often run on a different monitor.
+      </p>
+
+      <div class="warn">
+        <strong>Browser storage is a shortcut, not an archive.</strong> The protocol the gate
+        remembers disappears when browsing data is cleared and does not exist in another
+        browser or on another machine. Keep the protocol file and the calibration
+        <code>.json</code> with the study — see <a href="#calibration">Luminance
+        calibration</a> for the same point about the calibration.
+      </div>
+
+      <h3 id="autostart">Autostart (Run)</h3>
+      <p>
+        <em>Run</em> opens the stimulus without its settings panel. A confirmation screen
+        shows the figures worth checking before a recording — stimulus, trials, field size,
+        contrast, calibration, logging — and names any parameter that is out of range or not
+        recognized. Clicking <em>Start</em> there enters full-screen and begins.
+      </p>
+      <p>
+        When the run ends, by completion or by <kbd>Ctrl</kbd>+<kbd>Space</kbd>, the window
+        shows FINISHED and the name of the saved log, waits until the file has been saved, then
+        counts down five seconds and closes itself. A click during the countdown keeps it open.
+        Only a window opened by the gate's link can be closed this way; any other says so and
+        stays open.
+      </p>
+
+      <details>
+        <summary>The technical version: how a condition link is built</summary>
+        <p>
+          Stored: the stimulus file and every parameter except the shared keys
+          (<code>screen_width_px</code>, <code>screen_width_cm</code>,
+          <code>view_distance_cm</code>, <code>displayRefreshHz</code>,
+          <code>useFullscreen</code>, <code>dot_x</code>, <code>dot_y</code>,
+          <code>dotSize</code>, <code>syncDotFrames</code>, <code>hexSync1</code>&ndash;<code>hexSync3</code>,
+          <code>enableLogging</code>,
+          <code>note</code>, <code>cal</code>, <code>cal_name</code>) and the launch keys
+          <code>autostart</code>, <code>parity</code> and <code>theme</code>. The same split is applied whenever a
+          condition enters the protocol: <em>Add</em>, <em>↻</em>, a loaded protocol file, and
+          a list left in browser storage by an older version.
+        </p>
+        <p>
+          At launch the gate writes its own values for every shared key into the stored link.
+          An empty field removes the key, so the stimulus falls back to its own default (an
+          empty display refresh rate, for instance, is simply not reported). The calibration is
+          replaced the same way: with none in the gate, the condition runs without one, rather
+          than with whatever happened to be embedded in an old link.
+        </p>
+        <p>
+          The sync colors are written per page: <code>hexSync1</code> goes to every page,
+          <code>hexSync2</code> and <code>hexSync3</code> only to pages that present several
+          stimuli. A page started with <code>autostart</code> refuses parameters it does not
+          know, so sending the extra colors to a single-stimulus page would stop it.
+        </p>
+        <p>
+          The environment is kept in browser storage under <code>vep_gate_env</code>, the
+          protocol under <code>vep_protocol</code>, and the calibration under
+          <code>vep_gamma_calibration</code>.
+        </p>
+      </details>
+    </section>
+
+
+    <!-- ════════════════════════ RUN PANEL ════════════════════════ -->
+    <section id="runpanel">
+      <h2>Run panel and the stimulus window</h2>
+
+      <p>
+        One panel at the top of every stimulus page drives the run, whichever surface is
+        presenting. Underneath the buttons a status line reports two things at once: the state
+        of the stimulus window and the state of the run.
+      </p>
+
+      <table>
+        <thead><tr><th>Control</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td><em>Start</em></td><td>Begins the session on whichever surface is presenting: the separate stimulus window if one is open, otherwise this window.</td></tr>
+          <tr><td><em>Pause</em> / <em>Resume</em></td><td>Suspends and continues the run. Pauses are counted into the log.</td></tr>
+          <tr><td><em>Stop</em></td><td>Aborts. A log is still written if <em>Save log</em> is ticked.</td></tr>
+          <tr><td><em>Fullscreen</em></td><td>Asks for full-screen presentation and locks <em>Start</em> until it is really in effect.</td></tr>
+          <tr><td><em>↗ New window</em></td><td>Opens the stimulus in a separate window, to be moved to the presentation screen.</td></tr>
+          <tr><td><em>Save log</em> · <em>Session note</em></td><td>Whether to write a JSON log, and the free-text identifier stored in it. The note can be typed at any time, including mid-run.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Keys</h3>
+      <p>
+        <kbd>Ctrl</kbd>+<kbd>Space</kbd> stops the run, from either window, and is the only
+        stop key. <kbd>Space</kbd> alone pauses and resumes. In the stimulus window,
+        <kbd>F</kbd> or a click enters full-screen between sessions.
+      </p>
+      <p>
+        <kbd>Esc</kbd> is reserved by the browser for leaving full-screen and is not passed to
+        the page while full-screen. Leaving full-screen during a run is treated as stopping it:
+        the run ends and the log is saved. In a windowed run <kbd>Esc</kbd> does nothing, and
+        the status line says to press <kbd>Ctrl</kbd>+<kbd>Space</kbd> instead.
+      </p>
+      <p>
+        Typing in the session note or any other field is never intercepted: the shortcuts stand
+        down while a text field has focus, which is why stopping is on
+        <kbd>Ctrl</kbd>+<kbd>Space</kbd> rather than a bare key.
+      </p>
+
+      <h3>Presenting full-screen</h3>
+      <p>
+        A browser only grants full-screen to the window that asks for it, and only in response
+        to something the operator did in that window. The stimulus window therefore has to
+        enter full-screen itself: tick <em>Fullscreen</em> and then click once in the stimulus
+        window, or press <kbd>F</kbd> there. Ticking the box while that window is already open
+        is enough — it picks the change up and puts the prompt back on screen, so there is no
+        need to close and reopen it.
+      </p>
+      <p>
+        <em>Start</em> stays disabled until the stimulus window reports that it is presenting
+        full-screen. An OS-maximized window or a macOS virtual desktop counts: what matters is
+        that nothing else is visible around the stimulus, not which mechanism achieved it.
+      </p>
+
+      <details>
+        <summary>Why the gate on Start exists at all</summary>
+        <p>
+          Browser chrome, a taskbar or a second window's edge inside the subject's field of
+          view changes the mean luminance of the display and adds contours the stimulus did
+          not put there. Neither is visible in the log afterwards. Blocking the start is the
+          only point at which that can still be caught, so the check is deliberately strict:
+          the stimulus window has to say it is full-screen before the run can begin.
+        </p>
+      </details>
+
+      <h3>What happens after Start</h3>
+      <ol>
+        <li>A frame-rate measurement, about one second — see <a href="#framerate">Frame rate measurement</a>.</li>
+        <li>The pre-stimulus delay (<em>Start delay</em>), showing the blank or background field.</li>
+        <li>The stimulation itself.</li>
+        <li>A post-stimulus baseline of the same length as the start delay, so the epoch after
+          the last event is recorded under the same conditions as the one before the first.</li>
+        <li>The stimulus window shows FINISHED and the main window returns to its resting
+          state. The log, if requested, is offered for download at this point.</li>
+      </ol>
+    </section>
+
+    <!-- ════════════════════════ SCREEN ════════════════════════ -->
+    <section id="screen">
+      <h2>Screen calibration</h2>
+
+      <p>
+        Three parameters define the geometry of the experimental setup. Pixel-per-degree
+        values derived here are used to set stimulus spatial scale. For accurate luminance
+        reporting in cd/m², also run the display calibration wizard — see
+        <a href="#calibration">Luminance calibration</a>.
+      </p>
+
+      <table>
+        <thead><tr><th>Parameter</th><th>Symbol</th><th>Typical value</th><th>Source</th></tr></thead>
+        <tbody>
+          <tr><td>Screen width (pixels)</td><td><code>W<sub>px</sub></code></td><td>1920</td><td>Auto-detected, in CSS pixels</td></tr>
+          <tr><td>Screen width (cm)</td><td><code>W<sub>cm</sub></code></td><td>53</td><td>Measured with a ruler</td></tr>
+          <tr><td>Viewing distance (cm)</td><td><code>d</code></td><td>57</td><td>Measured eye-to-screen</td></tr>
+        </tbody>
+      </table>
+
+      <div class="warn">
+        <strong>All three must describe the display the subject looks at.</strong> Nothing in
+        the browser can check this, and getting it wrong scales every angle in the stimulus
+        without leaving any other trace: the log will faithfully record the numbers it was
+        given.
+      </div>
+
+      <h3>Which pixels?</h3>
+
+      <p>
+        A modern display often has more physical pixels than the browser counts. The number
+        this field wants is the one the <em>browser</em> sees, and auto-detection fills it in
+        correctly. The reason to know about it is that a figure read off the monitor's
+        specification sheet may be a different number — and using that one silently makes
+        every size in the stimulus wrong.
+      </p>
+
+      <p>
+        On a high-resolution laptop panel, for instance, the specification says 3584 pixels
+        across while the browser works in 1792. Entering 3584 would halve every spatial
+        frequency and double every mask: a grating asked for at 1 c/deg would be presented at
+        0.5, and a 2° mask would cover 4°. Nothing in the recording would show it.
+      </p>
+
+      <details>
+        <summary>The technical version: CSS pixels and the device pixel ratio</summary>
+        <p>
+          <code>W<sub>px</sub></code> is in <strong>CSS pixels</strong> — the coordinate system
+          the browser lays out and draws in. The canvas is sized from
+          <code>window.innerWidth</code>, all drawing coordinates are canvas pixels, and
+          <code>pixelsPerDegree</code> converts between those and visual angle, so every
+          quantity in the chain shares that unit.
+        </p>
+        <p>
+          The panel's native resolution differs from it by the device pixel ratio, reported as
+          <code>window.devicePixelRatio</code> and equal to 2 on a typical Retina or HiDPI
+          display. Multiplying <code>screen.width</code> by that ratio yields the native
+          resolution, which is the number on the specification sheet and the wrong unit here:
+          it scales <code>pixelsPerDegree</code> by the ratio, and every angle with it. The
+          ratio is recorded in the log under <code>screen_info.device_pixel_ratio</code>, so a
+          suspect session can be checked afterwards.
+        </p>
+      </details>
+
+      <h3>Presenting on a second monitor</h3>
+
+      <p>
+        When the stimulus is presented in a separate window on another display — the usual
+        arrangement, with the operator's settings on one screen and the subject's stimulus on
+        another — the geometry has to describe the second monitor, not the first.
+      </p>
+
+      <p>
+        Auto-detection can only report the screen the settings window is on. The physical width
+        in centimeters is something no browser can supply at all, on either screen. Both
+        therefore need attention when the two displays differ, and they usually do: a laptop
+        panel and an external monitor rarely share a pixel size.
+      </p>
+
+      <p>
+        The stimulus window reports which display it is on, and when that differs from the
+        settings window the Screen section says so and gives the width the presentation display
+        reports. Measure that monitor's physical width, enter both, and check the viewing
+        distance is the one to <em>that</em> screen.
+      </p>
+
+      <p>
+        It keeps reporting: change the presentation monitor's resolution, or drag the window to
+        another screen, and the warning follows within about a second. The refresh-rate estimate
+        on the settings panel also comes from the stimulus window whenever one is open, labeled
+        <em>stimulus display</em> — the panel's own reading would describe the operator's screen,
+        and 60 Hz against 120 Hz is a common mismatch. The exact rate is measured again in the
+        presenting window at the start of every session, and that is what the timing uses and
+        the log records. The APA paragraph and the refresh-mismatch warning on the settings
+        panel use the same figure: the stimulus window's rate whenever one is open, marked as
+        an estimate until a session has measured it, and never the rate of the settings
+        window's own display.
+      </p>
+
+      <div class="note">
+        <strong>A quick check costs nothing.</strong> The APA paragraph and the log both
+        state the visual field the stimulus covered. If a full-screen stimulus on a 53 cm
+        monitor at 57 cm reports about 50°, the geometry is right. If it reports 25° or 100°,
+        the pixel width is out by a factor of two in one direction or the other.
+      </div>
+
+      <p>
+        From these, the suite computes <em>pixels per degree of visual angle</em> (ppd), used
+        for all spatial calculations:
+      </p>
+
+      <div class="math">
+        ppd  =  (2 · d · tan(0.5°)) / (W<sub>cm</sub> / W<sub>px</sub>)
+      </div>
+
+      <p>The factor <code>2 · d · tan(0.5°)</code> is the physical width (cm) of one degree of
+        visual angle at distance <code>d</code>. Dividing by <code>W<sub>cm</sub>/W<sub>px</sub></code>
+        (cm per pixel) converts that physical width into pixels.</p>
+
+      <details>
+        <summary>Worked example: 53 cm at 57 cm with 1920 px wide</summary>
+        <pre><code>cm/px      = 53 / 1920          = 0.02760 cm
+2·57·tan(0.5°) = 2·57·0.008727  = 0.9949 cm/deg
+ppd        = 0.9949 / 0.02760   = 36.05 px/deg</code></pre>
+        <p>The well-known “57 cm rule” gives ~1 cm per degree, hence ppd ≈ pixels-per-cm.</p>
+      </details>
+
+      <h3>Visual field width</h3>
+      <p>
+        The full visual field subtended by the screen is reported in the APA description in
+        both width × height degrees and as the half-width from fixation:
+      </p>
+      <div class="math">
+        VF<sub>width</sub> = 2 · arctan(W<sub>cm</sub> / 2 / d) · 180/π
+      </div>
+      <p>
+        The screen height in cm is back-calculated from the pixel aspect ratio
+        (<code>W<sub>cm</sub> · H<sub>px</sub>/W<sub>px</sub></code>); for non-square pixels this
+        is an approximation but adequate for almost all modern displays.
+      </p>
+    </section>
+
+    <!-- ════════════════════════ ANGLE ════════════════════════ -->
+    <section id="angle">
+      <h2>Visual angle calculations</h2>
+
+      <figure>
+        <svg viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg">
+          <!-- Eye -->
+          <circle cx="60" cy="100" r="14" fill="none" stroke="#7bc8e8" stroke-width="2"/>
+          <circle cx="60" cy="100" r="5" fill="#7bc8e8"/>
+          <text x="60" y="135" text-anchor="middle" fill="#b8c5d0" font-size="13" font-family="sans-serif">eye</text>
+          <!-- Screen -->
+          <line x1="380" y1="30" x2="380" y2="170" stroke="#fff" stroke-width="3"/>
+          <text x="380" y="22" text-anchor="middle" fill="#7bc8e8" font-size="12" font-family="sans-serif">screen</text>
+          <text x="395" y="105" fill="#b8c5d0" font-size="12" font-family="sans-serif">W<tspan baseline-shift="sub" font-size="9">cm</tspan></text>
+          <!-- Lines from eye to screen edges -->
+          <line x1="60" y1="100" x2="380" y2="30"  stroke="#7bc8e8" stroke-width="1" stroke-dasharray="4 3"/>
+          <line x1="60" y1="100" x2="380" y2="170" stroke="#7bc8e8" stroke-width="1" stroke-dasharray="4 3"/>
+          <line x1="60" y1="100" x2="380" y2="100" stroke="#5a7a8a" stroke-width="1"/>
+          <!-- Distance label -->
+          <line x1="60" y1="180" x2="380" y2="180" stroke="#5a7a8a" stroke-width="1"/>
+          <line x1="60" y1="175" x2="60" y2="185" stroke="#5a7a8a" stroke-width="1"/>
+          <line x1="380" y1="175" x2="380" y2="185" stroke="#5a7a8a" stroke-width="1"/>
+          <text x="220" y="195" text-anchor="middle" fill="#b8c5d0" font-size="13" font-family="sans-serif">d  (viewing distance)</text>
+          <!-- Angle arc -->
+          <path d="M 110 100 A 50 50 0 0 0 110 80" fill="none" stroke="#e8a55a" stroke-width="1.5"/>
+          <text x="125" y="78" fill="#e8a55a" font-size="13" font-family="sans-serif">α/2</text>
+        </svg>
+        <figcaption>
+          Visual-angle geometry. Half the screen width subtends the half-angle <code>α/2</code>;
+          <code>tan(α/2) = (W<sub>cm</sub>/2) / d</code>, so <code>α = 2·arctan(W<sub>cm</sub>/(2d))</code>.
+        </figcaption>
+      </figure>
+
+      <p>
+        Throughout the suite, sizes are entered in <strong>degrees of visual angle</strong>
+        and converted internally to pixels via the ppd value. Reporting in both units
+        (degrees and pixels) is standard practice and is done automatically in the APA
+        description.
+      </p>
+
+    </section>
+
+    <!-- ════════════════════════ FRAMERATE ════════════════════════ -->
+    <section id="framerate">
+      <h2>Frame rate measurement</h2>
+
+      <p>
+        Nothing here assumes 60 Hz. Before every session the stimulus watches how quickly the
+        browser hands it frames, for about a second, and uses that rate for all the timing that
+        follows. This is what lets the same settings produce the same durations on a 60 Hz
+        monitor and a 120 Hz one.
+      </p>
+
+      <details>
+        <summary>The technical version: how the rate is measured</summary>
+        <p>
+          The stimulus runs in a measurement state for 60 frames with
+          <code>frameRate(999)</code>, which removes p5.js's internal throttle so the renderer
+          follows the browser's <code>requestAnimationFrame</code> callback directly rather than
+          a library-imposed cadence. The interval between successive frames is recorded and the
+          median taken.
+        </p>
+        <p>
+          The median rather than the mean: a single slow frame would drag an average upwards
+          and lengthen every duration derived from it, while it leaves the middle of the
+          distribution alone. The figures are below.
+        </p>
+      </details>
+
+      <div class="warn">
+        <strong>What this measures is how often the browser delivered a frame — not the
+        refresh rate of the display.</strong> The two are usually the same and sometimes are
+        not, and the difference matters enough to be worth understanding before it appears in
+        your data.
+      </div>
+
+      <h3>Delivered rate against display refresh</h3>
+
+      <p>
+        No browser API reports a display's refresh rate. <code>screen</code> does not expose
+        it and neither does the Window Management API. The only quantity available to a web
+        page is the cadence of its own animation callbacks, and on a machine with displays of
+        different refresh rates that cadence need not be the one the subject sees.
+      </p>
+
+      <p>
+        It is not settled by which monitor the window is on, either. A browser moved entirely
+        onto a 60 Hz display has been observed still receiving frames at the 120 Hz of another
+        connected panel. Whatever decides it sits below the browser, so the suite reports the
+        discrepancy without claiming a cause for it.
+      </p>
+
+      <p>
+        This is why the Screen section has an optional <strong>Display refresh (Hz)</strong>
+        field. Read the value from the operating system's display settings for the monitor the
+        subject looks at and enter it. When it disagrees with the measured delivery rate by
+        more than five per cent, the page says so, and the methods paragraph and the log
+        record both figures.
+      </p>
+
+      <div class="warn">
+        <strong>What a mismatch costs you.</strong> Whichever of the two rates is slower is
+        what the stimulus is really quantized to, and the two directions cost you different
+        things.
+        <br><br>
+        Frames arriving <em>faster</em> than the panel refreshes — 120 Hz delivered on a 60 Hz
+        display — means only some of them are ever shown. Durations land on multiples of
+        16.7 ms rather than 8.3 ms, and an event shorter than one refresh, such as a two-frame
+        sync flash, may fall between refreshes and never appear at all.
+        <br><br>
+        Frames arriving <em>slower</em> — 60 Hz delivered on a 120 Hz display — loses nothing:
+        every frame is shown, each held over two refreshes. The cost is only that the timing is
+        coarser than the panel could have resolved.
+        <br><br>
+        Either way the log faithfully records the durations it intended. Setting every connected
+        display to the same refresh rate is the dependable remedy; the photodiode trace is what
+        settles the question for a given recording.
+      </div>
+
+      <div class="math">
+        measuredFPS  =  1000 / median(deltaTime<sub>1..60</sub>)
+      </div>
+
+      <p>
+        The result is displayed in the Timing section of every stimulus and is reported in
+        the APA description and the JSON log. Frame-locked timings (e.g. flash duration in
+        frames, sync dot on-time) are converted to milliseconds using this measured value.
+      </p>
+
+      <div class="warn">
+        <strong>Variable refresh rates defeat the measurement.</strong> In adaptive-sync mode
+        (G-Sync / FreeSync), and with the browser not running at peak load, the measured
+        rate may not be the rate the stimulus actually runs at. For VEP work, set the display
+        to a fixed refresh rate.
+      </div>
+
+      <details>
+        <summary>Why median rather than mean?</summary>
+        <p>
+          A single 33 ms frame from a browser hiccup at the start of a 16.67 ms-target
+          session would shift the mean from 60.0 Hz to ~58 Hz. The median ignores such
+          outliers as long as they are fewer than half the samples. With 60 samples, up to
+          29 jank frames can occur without affecting the result.
+        </p>
+      </details>
+    </section>
+
+
+
+    <!-- ════════════════════════ CALIBRATION ════════════════════════ -->
+    <section id="calibration">
+      <h2>Luminance calibration</h2>
+
+      <p>
+        A pixel sent as V = 255 does not emit twice the light of one sent as V = 128 — the
+        relationship is the display's gamma characteristic, and it differs between panels and
+        between brightness settings. Calibration is the act of measuring it. With it, the
+        suite can linearize the stimuli, state contrast in luminance rather than in code
+        values, and report cd/m² in the log and the methods paragraph.
+      </p>
+
+      <p>
+        Without it, nothing breaks: sRGB is assumed, the stimuli work in relative units, and
+        no luminance figure is reported. That is a defensible way to run a pilot. It is not a
+        defensible way to publish a contrast.
+      </p>
+
+      <h3>Calibration models</h3>
+
+      <table>
+        <thead><tr><th>Model</th><th>What you measure</th><th>What it is good for</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>sRGB</strong></td>
+            <td>L<sub>max</sub> and L<sub>min</sub> only</td>
+            <td>The luminance range is real; the curve between them is assumed to follow the
+                sRGB standard. Reasonable on a compliant panel.</td>
+          </tr>
+          <tr>
+            <td><strong>Power law (γ)</strong></td>
+            <td>L<sub>max</sub>, L<sub>min</sub> and one exponent</td>
+            <td>Fits most CRTs and many LCDs with one number.</td>
+          </tr>
+          <tr>
+            <td><strong>Measured</strong></td>
+            <td>Photometer readings at ten gray levels; optionally the R, G and B channels
+                as well</td>
+            <td>The only model that reports cd/m². Required for anything published.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="note">
+        <strong>Measure the channels if color matters.</strong> A gray-only measurement says
+        nothing about how the primaries compare with each other, and the suite then has to
+        assume it. For achromatic stimuli that is irrelevant. For anything chromatic — and
+        for isoluminance in particular — it is the difference between a measurement and an
+        assumption. See <a href="#contrast">Contrast and photometry</a>.
+      </div>
+
+      <h3>Practical steps</h3>
+
+      <ol>
+        <li>Open <a href="display_calibration.html" target="vep_calibration"><code>display_calibration.html</code></a>.</li>
+        <li>Choose the model. For <em>Measured</em>, press
+          <strong>▶ Start guided measurement</strong>: the page shows full-screen patches one
+          at a time while you read the photometer and type each cd/m² value.</li>
+        <li>The fitted curve and a verification patch at V = 128 appear as you go, so a bad
+          reading shows up immediately rather than at the end.</li>
+        <li>Press <strong>↓ Download .json file</strong>. This file is the record of the
+          display state; keep it with the recording.</li>
+        <li>Press <strong>Open gate with this calibration</strong>. The gate opens with it
+          already loaded and passes it to every stimulus you launch.</li>
+      </ol>
+
+      <div class="warn">
+        <strong>A calibration is good for thirty days.</strong> The gate and every stimulus
+        page mark a calibration older than 30 days and ask for a new one. Recalibrate sooner if the monitor's
+        brightness or contrast settings change, or if the panel is replaced.
+      </div>
+
+      <h3>How the calibration reaches a stimulus</h3>
+
+      <p>
+        Two ways, and they are meant to cover different situations.
+      </p>
+
+      <ul>
+        <li><strong>In the link.</strong> The gate encodes the whole calibration into the
+          <code>cal</code> parameter and, when it knows the file name, adds
+          <code>cal_name</code> beside it. Every stimulus reads both. This is the normal
+          route, and it is the only one that works reliably when pages are opened as
+          <code>file://</code>.</li>
+        <li><strong>Loaded on the page itself.</strong> Each stimulus has
+          <em>Load calibration .json file…</em> under its calibration status line. What you
+          load there overrides whatever the link carried, and is written back into the link
+          the page shows — so it travels on to the stimulus window and to anyone you give the
+          link to. Reload the page to go back to the link's calibration.</li>
+      </ul>
+
+      <p>
+        The status line names what is in force: the model, L<sub>max</sub>, the date, and
+        whether it came from a named file or only from a link.
+      </p>
+
+      <pre><code>&#10003; Measured &#183; 312 cd/m&#178; &#183; Jul 20, 2026 &#183; file: monitor_a.json
+&#10003; sRGB &#183; 250 cd/m&#178; &#183; Jul 20, 2026 &#183; temporary (from link)
+&#9888; No calibration &#8212; sRGB assumed, relative units</code></pre>
+
+      <p>
+        <em>Temporary</em> does not mean unreliable — the calibration is complete either way.
+        It means no file name is known for it, so there is nothing to trace it back to. The
+        log records the same thing under <code>cal_source</code>: a file name where one is
+        known, otherwise <code>url</code> or <code>none</code>.
+      </p>
+
+      <div class="warn">
+        <strong>Browser storage is a shortcut, not an archive.</strong> The gate remembers the
+        last calibration you gave it so you need not load the file every session. That memory
+        is ordinary browser storage: clearing browsing data removes it, a private window never
+        sees it, another browser or machine has nothing, and Safari deletes script-writable
+        storage after about a week without interaction. The <code>.json</code> file and the
+        saved link are what survive. Failure is at least visible — when the memory is gone the
+        gate says there is no calibration, rather than quietly using an old one.
+      </div>
+
+      <details>
+        <summary>Why <code>file://</code> forces the calibration into the URL</summary>
+        <p>
+          Browser storage is partitioned by origin. When pages are served over http, all the
+          files in one folder share an origin and can therefore share storage. When they are
+          opened directly from disk, most browsers treat each file as its own origin, so what
+          the calibration page saves is invisible to the gate and the stimuli.
+        </p>
+        <p>
+          A link has no such restriction, which is why the calibration travels in one. It also
+          means the gate's own memory does work under <code>file://</code>: the restriction is
+          between different files, not between visits to the same one.
+        </p>
+      </details>
+
+      <details>
+        <summary>Calibration file format</summary>
+        <p>A measured grayscale calibration:</p>
+        <pre><code>{
+  "model":            "measured",
+  "L_max_cdm2":       120.0,
+  "L_min_cdm2":       0.20,
+  "monitor_note":     "Lab CRT, 80 % brightness",
+  "calibration_date": "2026-05-11T12:34:56.789Z",
+  "software_version": "1.2.0",
+  "measured_grey": [
+    {"V": 0,   "L": 0.20},
+    {"V": 16,  "L": 0.51},
+    {"V": 32,  "L": 1.45},
+    {"V": 64,  "L": 5.92},
+    {"V": 96,  "L": 14.2},
+    {"V": 128, "L": 26.5},
+    {"V": 160, "L": 43.2},
+    {"V": 192, "L": 64.4},
+    {"V": 224, "L": 90.3},
+    {"V": 255, "L": 120.0}
+  ]
+}</code></pre>
+        <p>
+          <code>"power"</code> replaces the measurement arrays with a <code>"gamma"</code>
+          exponent; <code>"srgb"</code> carries neither. Per-channel measurements add
+          <code>"measured_R"</code>, <code>"measured_G"</code> and
+          <code>"measured_B"</code> in the same form as
+          <code>"measured_grey"</code>.
+        </p>
+        <p>
+          A full measured RGB calibration encodes to roughly 1 600 characters in the
+          <code>cal</code> parameter, and a complete stimulus link to about 2 300 — well
+          inside what every current browser accepts.
+        </p>
+      </details>
+
+      <h3>Balancing the two phases of a radial pattern</h3>
+
+      <p>
+        A radial grating puts more screen area into its coarse outer rings than into the fine
+        central ones. One consequence is easy to miss: when such a pattern reverses, the two
+        phases do not average to quite the same brightness, so the whole field flickers
+        slightly at the reversal rate on top of the pattern change itself. The evoked response
+        cannot distinguish the two.
+      </p>
+
+      <p>
+        With a calibration loaded, the suite measures that imbalance and shifts the pattern to
+        remove it. The shift is reported in the log as <code>dc_correction_cdm2</code> and
+        stated in the methods paragraph, so it is part of the record rather than an invisible
+        adjustment. It is applied only where it makes sense: always for reversal, for onset
+        only when the pattern alternates, and never for motion onset, where a drifting pattern
+        has no second phase to be balanced against. Flash needs none, a uniform field having no
+        phases at all.
+      </p>
+
+      <div class="warn">
+        <strong>Without a calibration there is no correction.</strong> The imbalance is a
+        luminance quantity and cannot be computed from code values alone, so an uncalibrated
+        radial reversal carries whatever flicker the geometry produces. For a checkerboard the
+        question does not arise: its two phases cover equal area by construction.
+      </div>
+
+      <details id="gamma-lut">
+        <summary>Gamma linearization and DC correction — how they work</summary>
+        <p>
+          The radial grating is built as a lookup table over one spatial cycle. Interpolating
+          the two phase colors linearly in code values would not give a sinusoid on screen,
+          because the display's response is not linear: with γ around 2.2 the result is
+          visibly distorted.
+        </p>
+        <p>
+          Instead both endpoints are converted to luminance, the sinusoid is generated in
+          luminance, and each entry is converted back to a code value through the inverse
+          calibration. What varies sinusoidally is then the light, not the number.
+        </p>
+        <p>
+          For the measured model the forward and inverse functions are a Fritsch–Carlson
+          monotone cubic spline through the photometer readings. Monotonicity is what
+          guarantees the inverse exists and stays inside [0, 255].
+        </p>
+        <h4>DC correction for radial patterns</h4>
+        <p>
+          CMF weighting gives more screen area to the coarse peripheral rings than to the fine
+          central ones. The two phases of a reversal therefore do not have the same
+          area-weighted mean luminance, even with a perfectly sinusoidal LUT — the pattern
+          would carry a luminance flicker on top of the reversal.
+        </p>
+        <p>
+          With a calibration active, the area-weighted mean of one phase is compared with the
+          midpoint of the two phase luminances and the difference is added to every LUT entry.
+          The shift is reported in the log as <code>dc_correction_cdm2</code>, in the same
+          cd/m² as the other luminance fields, and stated in the APA paragraph.
+        </p>
+        <p>
+          It applies where it makes sense and nowhere else: always for reversal, for onset only
+          when the pattern alternates, and never for motion onset, where a drift has no phase
+          partner to be balanced against. Flash needs none — a uniform field has no phases.
+        </p>
+      </details>
+    </section>
+
+    <!-- ════════════════════════ CONTRAST ════════════════════════ -->
+    <section id="contrast">
+      <h2>Contrast and photometry</h2>
+
+      <p>
+        Every stimulus has two colors: light and dark for the patterns, flash and blank for
+        the flash. Their Michelson contrast in luminance is what the stimulus actually
+        delivers, and it is what goes into the log and the methods paragraph. You can set the
+        colors directly, or state the contrast you want and let the page work them out.
+      </p>
+
+      <h3>Asking for a contrast</h3>
+
+      <p>
+        Type a Michelson contrast in percent and a mean luminance, then press
+        <em>Apply to colors</em>. The two color fields are filled in with a pair that
+        delivers them:
+      </p>
+
+      <pre><code>L_high = L_mean &#215; (1 + C)        L_low = L_mean &#215; (1 &#8722; C)</code></pre>
+
+      <p>
+        Contrast and mean luminance are independent: changing one does not disturb the other.
+        The mean luminance field is in cd/m² when a calibration is loaded and in relative
+        units of full scale when none is, and the label next to it says which.
+      </p>
+
+      <div class="note">
+        <strong>The button is a proposal, not a mode.</strong> It writes into the ordinary
+        color fields and then steps back. Nothing stores the contrast you asked for; you can
+        edit either color afterwards and the reported contrast follows what the colors
+        actually are. This is deliberate — a stored target and an edited color would sooner
+        or later disagree, and the log would be wrong rather than merely surprising.
+      </div>
+
+      <p>
+        The line under the button always describes the current colors: the contrast they
+        deliver, their luminances when those can be reported, and what the luminance figures
+        rest on. Because the colors are quantized to eight bits, the delivered contrast is
+        rarely exactly the one requested; the line shows what was achieved, and that is the
+        number that is logged.
+      </p>
+
+      <p>
+        If the display cannot reach the request — a high contrast about a mean luminance close
+        to the panel's maximum, say — nothing is applied and the line says which channel ran
+        out of headroom. Silently clipping to something else would put an unintended stimulus
+        on screen.
+      </p>
+
+      <h3>Colors keep their hue</h3>
+
+      <p>
+        Each color moves along its own line towards black, in linear light, so its
+        chromaticity is preserved and only its luminance changes. A red stays red and a green
+        stays green; asking for 0 % contrast therefore gives the isoluminant version of the
+        pair rather than collapsing both to a single mixed color.
+      </p>
+
+      <p>
+        That case is a stimulus in its own right: an isoluminant red–green pattern isolates
+        the chromatic response from the luminance one. Two things are worth knowing before
+        relying on it.
+      </p>
+
+      <ul>
+        <li><strong>Eight bits set a floor.</strong> A pair asked to be isoluminant typically
+          lands within a few thousandths of Michelson zero, not at zero. The residual is
+          reported.</li>
+        <li><strong>Photometric is not individual.</strong> Isoluminance computed from a
+          display calibration is not isoluminance for a particular observer. If that
+          distinction matters for your question, it has to be established per observer, for
+          example by heterochromatic flicker photometry.</li>
+      </ul>
+
+      <h3>Pattern onset: the blank field</h3>
+
+      <p>
+        Pattern onset shows the pattern against a blank field and takes it away again. If the
+        blank does not sit at the pattern's mean luminance, each onset carries a step in
+        overall luminance on top of the pattern appearing — and the response cannot tell the
+        two apart.
+      </p>
+
+      <p>
+        The onset page therefore offers <em>Blank at pattern mean</em> beside the button,
+        on by default. When it is ticked, the page starts the blank at the mean luminance of
+        the pattern colors as it opens, and <em>Apply to colors</em> moves it there again
+        whenever it sets new colors; either way the blank keeps its own chromaticity and
+        changes only in brightness. A link that sets <code>hexBlank</code> is reproduced as
+        written — it is a recorded condition. Untick the box if you want the blank set by
+        hand.
+      </p>
+
+      <h3>How luminance is worked out</h3>
+
+      <p>
+        A color's luminance is the black level plus what each channel contributes above its
+        own dark point, weighted and summed. Two details of that sentence matter in practice.
+      </p>
+
+      <details>
+        <summary>Why each channel is measured from its own dark point</summary>
+        <p>
+          A channel driven to 0 still emits a little, and so does the panel as a whole. If a
+          channel's contribution were measured from the gray black level rather than from its
+          own, a channel at 0 would appear to still be emitting, and the black floor would be
+          counted three times over. The error is negligible for bright colors and large for
+          dark saturated ones — precisely the region where isoluminant pairs are set.
+        </p>
+      </details>
+
+      <details>
+        <summary>Where the channel weights come from</summary>
+        <p>
+          With all three primaries measured, their own curves carry the ratios between them.
+          One common scale is then applied so that the three contributions add up to the
+          directly measured white; the residual away from white is genuine non-additivity of
+          the panel, and is left as it is.
+        </p>
+        <p>
+          Without them, the three channels share the gray curve, and weighting them equally
+          would amount to claiming that every primary emits the same light. No display does.
+          Green typically emits around three times what red does and nine times what blue
+          does, so an equal weighting would make an isoluminant red–green pair a no-op — the
+          two would already appear equal to the model.
+        </p>
+        <p>
+          The suite therefore falls back to the relative primary luminances of the BT.709 /
+          sRGB color space: 0.2126 for red, 0.7152 for green, 0.0722 for blue, applied to
+          linear light. They sum to one, so an achromatic color still reproduces the measured
+          gray curve exactly. On a typical panel they land within about a percent of what a
+          per-channel measurement gives; on a wide-gamut display they will not, since its
+          primaries are not the BT.709 ones.
+        </p>
+        <p>
+          This is an assumption and the software says so. The log records
+          <code>luminance_basis</code> as <code>measured_channels</code> or
+          <code>measured_grey_srgb_primaries</code>, the line under
+          <em>Apply to colors</em> ends with <em>R/G/B measured</em> or
+          <em>R/G/B assumed from sRGB primaries</em>, and the APA paragraph cites the
+          standards it took the numbers from.
+        </p>
+      </details>
+
+      <div class="warn">
+        <strong>Luminances are estimates, not session photometry.</strong> Every cd/m² figure
+        the suite reports is computed from the calibration's transfer function, not measured
+        while the subject was in front of the screen. The APA paragraph states this outright,
+        so a methods section cannot accidentally claim more than was done.
+      </div>
+    </section>
+
+    <!-- ════════════════════════ CHECKER ════════════════════════ -->
+    <section id="checker">
+      <h2>Checkerboard pattern</h2>
+
+      <p>
+        Two of the stimuli (Pattern Reversal, Pattern Onset) provide a checkerboard option.
+        It is rendered so that <strong>the four corners of the four quadrant sectors meet
+        at the exact center of the display</strong>, which is the centered arrangement the
+        ISCEV standard describes. Everything else about the pattern — check size, field size,
+        contrast — is yours to set, and whether the result conforms is a question about your
+        protocol. Check size is entered in degrees of visual angle and converted to pixels
+        using the measured ppd.
+      </p>
+      <details>
+        <summary>Pixel-level parity calculation</summary>
+        <p>
+          Each pixel at <code>(x, y)</code> receives a check identity
+          <code>parity = ⌊(x − cx)/checkPx⌋ XOR ⌊(y − cy)/checkPx⌋</code>, where
+          <code>checkPx = checkSize_deg · ppd</code>. Even parity is rendered in the dark
+          color, odd parity in the light color.
+        </p>
+      </details>
+
+      <figure>
+        <svg viewBox="0 0 480 270" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="cbA" x="240" y="135" width="40" height="40" patternUnits="userSpaceOnUse">
+              <rect width="20" height="20" fill="#fff"/>
+              <rect x="20" y="20" width="20" height="20" fill="#fff"/>
+              <rect x="20" y="0" width="20" height="20" fill="#0d0d0d"/>
+              <rect x="0" y="20" width="20" height="20" fill="#0d0d0d"/>
+            </pattern>
+          </defs>
+          <rect width="480" height="270" fill="url(#cbA)"/>
+          <!-- Centre marker -->
+          <line x1="240" y1="0" x2="240" y2="270" stroke="rgba(232,165,90,.5)" stroke-width="0.8" stroke-dasharray="4 2"/>
+          <line x1="0" y1="135" x2="480" y2="135" stroke="rgba(232,165,90,.5)" stroke-width="0.8" stroke-dasharray="4 2"/>
+          <!-- fixation cross -->
+          <line x1="232" y1="135" x2="248" y2="135" stroke="#ff5050" stroke-width="2"/>
+          <line x1="240" y1="127" x2="240" y2="143" stroke="#ff5050" stroke-width="2"/>
+        </svg>
+        <figcaption>
+          Checkerboard tiled from the screen center. The center lines pass through the
+          common corner of the four central checks; the red cross marks the fixation point.
+        </figcaption>
+      </figure>
+
+      <details>
+        <summary>Reversal mechanism</summary>
+        <p>
+          Reversal is implemented as a 180° phase shift of a global lookup table (LUT)
+          offset, swapping the two colors simultaneously across the entire pattern. The
+          structure of the checkerboard never changes; only the assignment of color to
+          each cell is inverted. This avoids any spatial motion artifacts during reversal.
+        </p>
+      </details>
+    </section>
+
+
+    <!-- ════════════════════════ RADIAL ════════════════════════ -->
+    <section id="radial">
+      <h2>Radial sinusoidal grating</h2>
+
+      <p>
+        The radial pattern is a fullscreen sinusoidal grating whose <em>spatial frequency
+        varies with eccentricity</em>. The grating is concentric — the brightness of any
+        pixel depends only on its radial distance from the center.
+      </p>
+
+      <figure>
+        <svg viewBox="0 0 480 270" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="rg" cx="240" cy="135" r="280" fx="240" fy="135" gradientUnits="userSpaceOnUse">
+              <stop offset="0%"   stop-color="#0d0d0d"/>
+              <stop offset="5%"   stop-color="#fff"/>
+              <stop offset="10%"  stop-color="#0d0d0d"/>
+              <stop offset="17%"  stop-color="#fff"/>
+              <stop offset="26%"  stop-color="#0d0d0d"/>
+              <stop offset="37%"  stop-color="#fff"/>
+              <stop offset="50%"  stop-color="#0d0d0d"/>
+              <stop offset="65%"  stop-color="#fff"/>
+              <stop offset="82%"  stop-color="#0d0d0d"/>
+              <stop offset="100%" stop-color="#fff"/>
+            </radialGradient>
+          </defs>
+          <rect width="480" height="270" fill="#0d0d0d"/>
+          <rect width="480" height="270" fill="url(#rg)"/>
+          <!-- fixation cross -->
+          <line x1="232" y1="135" x2="248" y2="135" stroke="#ff5050" stroke-width="2"/>
+          <line x1="240" y1="127" x2="240" y2="143" stroke="#ff5050" stroke-width="2"/>
+        </svg>
+        <figcaption>
+          Concentric sinusoidal grating — high spatial frequency at fixation, decreasing
+          toward the periphery following the cortical magnification factor.
+          The red cross marks the fixation point.
+        </figcaption>
+      </figure>
+
+      <details>
+        <summary>Phase and brightness calculation</summary>
+        <p>
+          For each pixel the suite computes the cumulative phase
+          <code>Φ(r) = ∫₀ʳ f(r') dr'</code> in cycles, where <code>f(r)</code> is the
+          spatial frequency at radius <code>r</code>. The fractional part of <code>Φ(r)</code>
+          is the LUT index used to look up the rendered brightness. The brightness ramp is
+          sinusoidal:
+        </p>
+        <div class="math">p  =  ½ + ½ · sin(2π · Φ(r))</div>
+        <p>
+          The result interpolates between the dark and light phase colors at full amplitude:
+          <code>p</code> reaches 0 and 1, so the grating spans the whole pair. The pattern's
+          contrast is therefore the contrast of the two colors and nothing else — there is no
+          separate depth-of-modulation setting to multiply it by. See
+          <a href="#contrast">Contrast and photometry</a>.
+        </p>
+        <p>
+          With a calibration active the interpolation happens in luminance rather than in code
+          values, so what varies sinusoidally is the light on screen — see
+          <a href="#gamma-lut">Gamma linearization</a>.
+        </p>
+      </details>
+    </section>
+
+    <!-- ════════════════════════ CMF ════════════════════════ -->
+    <section id="cmf">
+      <h2>CMF weighting</h2>
+
+      <p>
+        For both the Pattern Reversal / Onset radial mode and the Motion Onset stimulus,
+        spatial frequency varies with eccentricity following a cortical magnification
+        factor (CMF) profile (Kremláček et al., 2004):
+      </p>
+
+      <details>
+        <summary>CMF profile and frequency interpolation formula</summary>
+        <div class="math">CMF(e)  =  1 / (0.1 · e + 1)</div>
+        <p>
+          where <code>e</code> is eccentricity in degrees. Spatial frequency is interpolated
+          between <code>cent_freq</code> and <code>per_freq</code> using this profile:
+        </p>
+        <div class="math">f(r) = cent_freq + (per_freq − cent_freq) · (1 − CMF(r)) / (1 − CMF(R))</div>
+        <p>
+          This guarantees <code>f(0) = cent_freq</code> and <code>f(R) = per_freq</code>,
+          where <code>R</code> is the maximum canvas radius.
+        </p>
+      </details>
+
+      <details>
+        <summary>Why this profile?</summary>
+        <p>
+          The visual cortex has roughly logarithmic representation of eccentricity: more
+          neurons per degree at fixation than in the periphery. By scaling spatial frequency
+          inversely, the radial grating produces approximately equal responses per unit
+          cortical surface area, which improves signal-to-noise ratio in single-trial VEPs
+          and reduces over-representation of the central few degrees.
+        </p>
+        <p>
+          Reference: Kremláček, J., Kuba, M., Kubová, Z., Chlubnová, J., &amp; Szanyi, J.
+          (2004). Motion-onset VEPs to translating, radial, rotating and spiral stimuli.
+          <em>Documenta Ophthalmologica</em>, 109, 169–175.
+        </p>
+      </details>
+    </section>
+
+    <!-- ════════════════════════ LUT ════════════════════════ -->
+    <section id="lut">
+      <h2>LUT phase mechanism</h2>
+
+      <p>
+        Both pattern types share the same rendering pipeline: a pre-computed per-pixel
+        index buffer is used on every frame with a single global offset that shifts the
+        entire pattern phase. This allows instantaneous pattern reversal and smooth motion
+        with minimal CPU cost.
+      </p>
+      <details>
+        <summary>LUT implementation details</summary>
+        <p>
+          A per-pixel index buffer <code>baseIdx</code> stores each pixel's lookup-table
+          address. The rendered color is
+          <code>LUT[(baseIdx[p] + globalOffset) &amp; LUT_MASK]</code>. With
+          <code>LUT_SIZE = 1024</code>, a global offset of <code>LUT_SIZE/2</code> shifts
+          every pixel's lookup by 180° — equivalent to a phase-inversion of the entire
+          pattern in a single integer add per pixel.
+        </p>
+        <p>This is exploited by:</p>
+        <ul>
+          <li><strong>Pattern reversal</strong> — toggling the offset between 0 and
+            <code>LUT_SIZE/2</code> at each reversal event.</li>
+          <li><strong>Pattern onset (alternation option)</strong> — flipping the offset on
+            every even-numbered trial to avoid long-term luminance adaptation.</li>
+          <li><strong>Motion onset</strong> — incrementing the offset continuously to produce
+            smooth radial motion.</li>
+        </ul>
+        <p>
+          Because <code>baseIdx</code> is computed once per session, rendering each frame
+          is just a tight pixel loop — fast enough for native display refresh on integrated
+          graphics.
+        </p>
+      </details>
+    </section>
+
+
+    <!-- ════════════════════════ FIXATION ════════════════════════ -->
+    <section id="fixation">
+      <h2>Fixation cross</h2>
+
+      <p>
+        A simple cross hair at the screen center. Configurable parameters:
+      </p>
+
+      <table>
+        <thead><tr><th>Parameter</th><th>Default</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>Show fixation cross</td><td>on</td><td>Master enable.</td></tr>
+          <tr><td>Radius (deg)</td><td>0.25</td><td>Half-arm length, in degrees.</td></tr>
+          <tr><td>Thickness (px)</td><td>2</td><td>Stroke width.</td></tr>
+          <tr><td>Color</td><td>#ff0000</td><td>Editable via swatch / hex input.</td></tr>
+        </tbody>
+      </table>
+
+
+      <p>
+        The cross is drawn <em>on top of</em> the pattern and the masks. Only the sync dot
+        is drawn over it, so the cross can never reach the photodiode's patch. In the
+        Pattern Onset stimulus it remains visible during the OFF (blank) phase.
+      </p>
+    </section>
+
+    <!-- ════════════════════════ MASKING ════════════════════════ -->
+    <section id="masking">
+      <h2>Masking</h2>
+
+      <p>
+        Masks replace pixels with a uniform mask color (default #808080). They are
+        applied after the pattern is drawn and before the fixation and sync dot, so the
+        fixation cross is always visible regardless of the mask configuration.
+      </p>
+
+      <h3>Mask types</h3>
+
+      <div class="fig-row">
+        <figure>
+          <svg viewBox="0 0 480 270" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern id="cb-mini" x="240" y="135" width="30" height="30" patternUnits="userSpaceOnUse">
+                <rect width="15" height="15" fill="#fff"/>
+                <rect x="15" y="15" width="15" height="15" fill="#fff"/>
+                <rect x="15" y="0" width="15" height="15" fill="#0d0d0d"/>
+                <rect x="0" y="15" width="15" height="15" fill="#0d0d0d"/>
+              </pattern>
+            </defs>
+            <rect width="480" height="270" fill="url(#cb-mini)"/>
+            <circle cx="240" cy="135" r="65" fill="#808080"/>
+            <!-- fixation cross -->
+            <line x1="232" y1="135" x2="248" y2="135" stroke="#ff5050" stroke-width="2"/>
+            <line x1="240" y1="127" x2="240" y2="143" stroke="#ff5050" stroke-width="2"/>
+          </svg>
+          <figcaption><strong>Central mask</strong> — replaces all pixels within radius from fixation.</figcaption>
+        </figure>
+
+        <figure>
+          <svg viewBox="0 0 480 270" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern id="cb-mini2" x="240" y="135" width="30" height="30" patternUnits="userSpaceOnUse">
+                <rect width="15" height="15" fill="#fff"/>
+                <rect x="15" y="15" width="15" height="15" fill="#fff"/>
+                <rect x="15" y="0" width="15" height="15" fill="#0d0d0d"/>
+                <rect x="0" y="15" width="15" height="15" fill="#0d0d0d"/>
+              </pattern>
+              <clipPath id="innerCircle">
+                <circle cx="240" cy="135" r="100"/>
+              </clipPath>
+            </defs>
+            <rect width="480" height="270" fill="#808080"/>
+            <rect width="480" height="270" fill="url(#cb-mini2)" clip-path="url(#innerCircle)"/>
+            <!-- fixation cross -->
+            <line x1="232" y1="135" x2="248" y2="135" stroke="#ff5050" stroke-width="2"/>
+            <line x1="240" y1="127" x2="240" y2="143" stroke="#ff5050" stroke-width="2"/>
+          </svg>
+          <figcaption><strong>Peripheral mask</strong> — replaces all pixels beyond radius from fixation.</figcaption>
+        </figure>
+      </div>
+
+      <figure>
+        <svg viewBox="0 0 480 270" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="cb-mini3" x="240" y="135" width="30" height="30" patternUnits="userSpaceOnUse">
+              <rect width="15" height="15" fill="#fff"/>
+              <rect x="15" y="15" width="15" height="15" fill="#fff"/>
+              <rect x="15" y="0" width="15" height="15" fill="#0d0d0d"/>
+              <rect x="0" y="15" width="15" height="15" fill="#0d0d0d"/>
+            </pattern>
+          </defs>
+          <rect width="480" height="270" fill="url(#cb-mini3)"/>
+          <!-- Q1: top-right sector -->
+          <path d="M 240 135 L 240 10 A 125 125 0 0 1 365 135 Z" fill="#808080"/>
+          <!-- Q3: bottom-left sector -->
+          <path d="M 240 135 L 240 260 A 125 125 0 0 1 115 135 Z" fill="#808080"/>
+          <line x1="0" y1="135" x2="480" y2="135" stroke="rgba(123,200,232,.4)" stroke-width="0.8" stroke-dasharray="3 2"/>
+          <line x1="240" y1="0" x2="240" y2="270" stroke="rgba(123,200,232,.4)" stroke-width="0.8" stroke-dasharray="3 2"/>
+          <!-- fixation cross -->
+          <line x1="232" y1="135" x2="248" y2="135" stroke="#ff5050" stroke-width="2"/>
+          <line x1="240" y1="127" x2="240" y2="143" stroke="#ff5050" stroke-width="2"/>
+        </svg>
+        <figcaption>
+          <strong>Quadrant masks</strong> — each quadrant (Q1 top-right, Q2 top-left,
+          Q3 bottom-left, Q4 bottom-right) can be masked independently within its own
+          radius. Above: Q1 and Q3 masked. Useful for hemifield studies.
+        </figcaption>
+      </figure>
+
+      <h3>Quadrant naming</h3>
+      <p>
+        Quadrants are numbered following the standard mathematical convention:
+        Q1 = top-right, Q2 = top-left, Q3 = bottom-left, Q4 = bottom-right.
+      </p>
+
+      <details>
+        <summary>How masks are computed</summary>
+        <p>
+          On session start, the suite pre-computes a list of pixel indices for every active
+          mask. During each frame's <code>blit</code> step, the mask color is written into
+          those indices in a tight loop — there is no per-frame distance calculation. This
+          keeps the per-frame cost constant regardless of mask geometry.
+        </p>
+      </details>
+    </section>
+
+    <!-- ════════════════════════ SYNC ════════════════════════ -->
+    <section id="sync">
+      <h2>Synchronization</h2>
+
+      <p>
+        Each stimulus draws a small square (the “sync dot”) at a configurable screen
+        position. It lights up in its trigger color for a few frames at each sync event and
+        is black at all other times — on every stimulus, flash included. A photodiode taped
+        to the screen at this position produces a clean step that can be used as a trigger
+        for EEG / MEG recordings.
+      </p>
+
+      <h3>Dot color</h3>
+      <p>
+        The trigger color is white by default, which suits a photodiode that measures
+        luminance. With an RGB photodiode, choose a single primary — <code>#ff0000</code>,
+        <code>#00ff00</code> or <code>#0000ff</code> — so that only one channel responds. The
+        color is set with the swatch beside the <em>Synchronization</em> heading on each
+        stimulus page, or in the gate.
+      </p>
+      <p>
+        The gate holds three colors, one per stimulus. <em>Stimulus 1</em> is the color every
+        single-stimulus page uses (flash, reversal, onset, motion). <em>Stimuli 2</em> and
+        <em>3</em> apply only to pages that present more than one stimulus in a session
+        (<a href="#oddball">Oddball VEP</a>), where
+        each stimulus fires the dot in its own color so the recording can tell them apart.
+        The gate warns when two stimuli share a color.
+      </p>
+      <div class="warn">
+        <strong>A single primary is much darker than white.</strong> Pure blue carries roughly
+        7&nbsp;% and pure red roughly 21&nbsp;% of the luminance of white. A luminance photodiode whose threshold
+        was set for a white dot may not respond to them. Check the trigger after changing the
+        color.
+      </div>
+
+      <h3>Parameters</h3>
+      <table>
+        <thead><tr><th>Parameter</th><th>Default</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>Dot X (px)</td><td>32</td><td>Horizontal pixel coordinate of the dot center.</td></tr>
+          <tr><td>Dot Y (px)</td><td>32</td><td>Vertical pixel coordinate.</td></tr>
+          <tr><td>Dot on-time (frames)</td><td>2</td><td>Duration of each flash in frames.</td></tr>
+          <tr><td>Dot size (px)</td><td>32</td><td>Single value for both width and height; configurable.</td></tr>
+          <tr><td>Dot color</td><td>#ffffff</td><td>Color while the dot fires; black at all other times.</td></tr>
+        </tbody>
+      </table>
+
+      <figure>
+        <svg viewBox="0 0 480 270" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0" y="0" width="480" height="270" fill="#0d0d0d"/>
+          <text x="240" y="20" text-anchor="middle" fill="#7a8a98" font-size="12" font-family="sans-serif">screen (1920 × 1080 px shown to scale)</text>
+          <!-- Sync dot (top-left default) -->
+          <rect x="8" y="36" width="8" height="8" fill="#fff" stroke="#e8a55a"/>
+          <text x="22" y="45" fill="#e8a55a" font-size="11" font-family="sans-serif">sync dot (32, 32) px</text>
+          <!-- Centre cross marker -->
+          <line x1="232" y1="135" x2="248" y2="135" stroke="#ff5050" stroke-width="1.5"/>
+          <line x1="240" y1="127" x2="240" y2="143" stroke="#ff5050" stroke-width="1.5"/>
+          <text x="240" y="160" text-anchor="middle" fill="#7a8a98" font-size="11" font-family="sans-serif">fixation</text>
+          <!-- Dotted boundary -->
+          <rect x="2" y="22" width="476" height="246" fill="none" stroke="#5a7a8a" stroke-width="1" stroke-dasharray="3 2"/>
+        </svg>
+        <figcaption>
+          Default sync dot position (top-left, 32 × 32 px patch). Its trigger color (white
+          by default) during a sync event, black otherwise — electrically silent until the
+          trigger moment.
+        </figcaption>
+      </figure>
+
+      <h3>When the dot fires</h3>
+      <table>
+        <thead><tr><th>Stimulus</th><th>Trigger event(s)</th><th>Configurable</th></tr></thead>
+        <tbody>
+          <tr><td>Flash VEP</td><td>Each flash onset</td><td><code>syncOnFlash</code></td></tr>
+          <tr><td>Pattern Reversal VEP</td><td>Each reversal</td><td><code>syncOnReversal</code></td></tr>
+          <tr><td>Pattern Onset VEP</td><td>Pattern onset (default), pattern offset (optional)</td><td><code>syncOnOnset</code>, <code>syncOnOffset</code></td></tr>
+          <tr><td>Motion Onset VEP</td><td>Motion onset (default), motion offset (optional)</td><td><code>syncOnOnset</code>, <code>syncOnOffset</code></td></tr>
+        </tbody>
+      </table>
+
+      <div class="note">
+        <strong>Only the sync dot should reach the photodiode.</strong> Cover the photodiode
+        and the surrounding bezel with opaque tape so that the dot is all it sees. Position the photodiode in
+        a corner of the screen well away from the central stimulus to avoid scattered-light
+        artifacts in the recording.
+      </div>
+    </section>
+
+
+    <!-- ════════════════════════ FLASH STIMULUS ════════════════════════ -->
+    <section id="flash">
+      <h2>Flash VEP <small style="font-size:.7em; color:var(--text-mute); font-weight:400;">(<a href="flash_vep.html" target="vep_settings_flash" style="color:inherit; text-underline-offset:.2em;">flash_vep.html</a>)</small></h2>
+
+      <p>
+        A full-field luminance flash. The entire screen alternates between a flash color
+        (default white) and a blank color (default black) at a configurable frequency.
+      </p>
+
+      <h3>Timing</h3>
+      <p>
+        Frame-locked. The full cycle length in frames is
+      </p>
+      <div class="math">
+        cycleLenFrames  =  round(measuredFPS / flashFreq)
+      </div>
+      <p>
+        and the flash occupies the first <code>flashFrames</code> frames of each cycle.
+        The remainder is the dark interval. At 60 Hz with 2 Hz flash frequency:
+        <code>cycleLenFrames = 30</code>; with <code>flashFrames = 2</code> the flash is
+        ~33.3 ms and the blank is ~466.7 ms.
+      </p>
+
+      <figure>
+        <svg viewBox="0 0 600 130" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0" y="0" width="600" height="130" fill="#1d2128"/>
+          <!-- Time axis -->
+          <line x1="40" y1="100" x2="580" y2="100" stroke="#5a7a8a" stroke-width="1"/>
+          <text x="586" y="104" fill="#7a8a98" font-size="11" font-family="sans-serif">t</text>
+          <!-- Square wave: blank-flash-blank-flash -->
+          <g stroke="#7bc8e8" stroke-width="2" fill="none">
+            <path d="M 50 90 L 130 90 L 130 30 L 145 30 L 145 90 L 290 90 L 290 30 L 305 30 L 305 90 L 450 90 L 450 30 L 465 30 L 465 90 L 570 90"/>
+          </g>
+          <!-- Labels -->
+          <text x="80" y="115" fill="#7a8a98" font-size="11" font-family="sans-serif">blank</text>
+          <text x="135" y="22" fill="#7bc8e8" font-size="11" font-family="sans-serif">flash</text>
+          <text x="220" y="115" fill="#7a8a98" font-size="11" font-family="sans-serif">blank</text>
+          <!-- Cycle marker -->
+          <line x1="130" y1="115" x2="290" y2="115" stroke="#e8a55a" stroke-width=".7"/>
+          <line x1="130" y1="111" x2="130" y2="119" stroke="#e8a55a" stroke-width=".7"/>
+          <line x1="290" y1="111" x2="290" y2="119" stroke="#e8a55a" stroke-width=".7"/>
+          <text x="210" y="128" fill="#e8a55a" font-size="11" font-family="sans-serif" text-anchor="middle">1 cycle = 1/flashFreq</text>
+        </svg>
+        <figcaption>Flash timing. The screen alternates between blank (low) and flash (high) on a fixed cycle.</figcaption>
+      </figure>
+
+      <h3>Parameters specific to Flash VEP</h3>
+      <table class="kv">
+        <tbody>
+          <tr><td><code>flashFreq</code></td><td>Repetition rate (Hz)</td><td>0.5 – ~30</td></tr>
+          <tr><td><code>flashFrames</code></td><td>Flash duration in frames</td><td>1 – cycleLen − 1</td></tr>
+          <tr><td><code>nFlashes</code></td><td>Number of flashes per session</td><td>≥ 1</td></tr>
+          <tr><td><code>hexFlash</code></td><td>Flash color (default #ffffff)</td><td>Any RGB</td></tr>
+          <tr><td><code>hexBlank</code></td><td>Blank color (default #000000)</td><td>Any RGB</td></tr>
+        </tbody>
+      </table>
+
+      <div class="note">
+        <strong>The flash page draws no pattern.</strong> The whole field is the flash or the
+        blank color. The fixation cross and the masks work as on the pattern stimuli and are
+        drawn over the field in both phases.
+      </div>
+    </section>
+
+
+    <!-- ════════════════════════ REVERSAL STIMULUS ════════════════════════ -->
+    <section id="reversal">
+      <h2>Pattern Reversal VEP <small style="font-size:.7em; color:var(--text-mute); font-weight:400;">(<a href="pattern_reversal_vep.html" target="vep_settings_reversal" style="color:inherit; text-underline-offset:.2em;">pattern_reversal_vep.html</a>)</small></h2>
+
+      <p>
+        A static pattern (checkerboard or radial sinusoidal) whose phase reverses at a
+        fixed rate. Each reversal is a 180° LUT phase shift, swapping light and dark
+        colors instantaneously without any spatial motion.
+      </p>
+
+      <figure>
+        <svg viewBox="0 0 600 150" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0" y="0" width="600" height="150" fill="#1d2128"/>
+          <!-- Time axis -->
+          <line x1="40" y1="120" x2="580" y2="120" stroke="#5a7a8a" stroke-width="1"/>
+          <text x="586" y="124" fill="#7a8a98" font-size="11" font-family="sans-serif">t</text>
+          <!-- Square wave: A-B-A-B alternation -->
+          <g stroke="#7bc8e8" stroke-width="2" fill="none">
+            <path d="M 50 90 L 170 90 L 170 30 L 290 30 L 290 90 L 410 90 L 410 30 L 530 30 L 530 90 L 580 90"/>
+          </g>
+          <text x="100" y="105" fill="#7a8a98" font-size="11" font-family="sans-serif">phase A</text>
+          <text x="220" y="22" fill="#7bc8e8" font-size="11" font-family="sans-serif">phase B</text>
+          <text x="340" y="105" fill="#7a8a98" font-size="11" font-family="sans-serif">phase A</text>
+          <text x="460" y="22" fill="#7bc8e8" font-size="11" font-family="sans-serif">phase B</text>
+          <!-- Half-period marker -->
+          <line x1="170" y1="135" x2="290" y2="135" stroke="#e8a55a" stroke-width=".7"/>
+          <line x1="170" y1="131" x2="170" y2="139" stroke="#e8a55a" stroke-width=".7"/>
+          <line x1="290" y1="131" x2="290" y2="139" stroke="#e8a55a" stroke-width=".7"/>
+          <text x="230" y="148" fill="#e8a55a" font-size="11" font-family="sans-serif" text-anchor="middle">half-period = 1/rate</text>
+        </svg>
+        <figcaption>Reversal timing. Each reversal flips the pattern from phase A to phase B (or vice versa).</figcaption>
+      </figure>
+
+      <h3>Parameters specific to Reversal VEP</h3>
+      <table class="kv">
+        <tbody>
+          <tr><td><code>patternType</code></td><td>checker / radial</td><td>Default: checker</td></tr>
+          <tr><td><code>reversalsPerSec</code></td><td>Reversal rate, in reversals per second — not Hz, since one reversal is one trial</td><td>Default 2, the ISCEV standard rate</td></tr>
+          <tr><td><code>nCycles</code></td><td>Number of reversals (not full cycles)</td><td>≥ 1</td></tr>
+          <tr><td><code>checkSize</code></td><td>(checker only) Check size in degrees</td><td>Default 1, the ISCEV large check; 0.25 is its small check</td></tr>
+          <tr><td><code>cent_freq</code> / <code>per_freq</code></td><td>(radial only) c/deg at fixation / periphery</td><td>Default 1 / 0.05</td></tr>
+        </tbody>
+      </table>
+
+      <details>
+        <summary>What does “half-period” mean in the log?</summary>
+        <p>
+          The reversal log records each reversal event as one trial. Phase A and phase B
+          alternate, so two consecutive trials make up one full visual cycle and the time
+          between trials is half of it. The <code>half_period_ms</code> field is that time:
+          <code>half_period_frames</code> = round(refresh rate / <code>reversalsPerSec</code>)
+          frames, about <code>1000/reversalsPerSec</code> ms — 500&nbsp;ms at the default
+          2 reversals per second.
+        </p>
+      </details>
+    </section>
+
+
+    <!-- ════════════════════════ ONSET STIMULUS ════════════════════════ -->
+    <section id="onset">
+      <h2>Pattern Onset VEP <small style="font-size:.7em; color:var(--text-mute); font-weight:400;">(<a href="pattern_onset_vep.html" target="vep_settings_onset" style="color:inherit; text-underline-offset:.2em;">pattern_onset_vep.html</a>)</small></h2>
+
+      <p>
+        Each trial consists of an ON phase (the pattern is visible) followed by an OFF
+        phase (uniform blank screen). The fixation cross remains visible during both
+        phases.
+      </p>
+
+      <figure>
+        <svg viewBox="0 0 600 150" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0" y="0" width="600" height="150" fill="#1d2128"/>
+          <line x1="40" y1="120" x2="580" y2="120" stroke="#5a7a8a" stroke-width="1"/>
+          <text x="586" y="124" fill="#7a8a98" font-size="11" font-family="sans-serif">t</text>
+          <!-- ON-OFF-ON-OFF -->
+          <g stroke="#7bc8e8" stroke-width="2" fill="none">
+            <path d="M 50 90 L 110 90 L 110 30 L 150 30 L 150 90 L 350 90 L 350 30 L 390 30 L 390 90 L 580 90"/>
+          </g>
+          <text x="125" y="22" fill="#7bc8e8" font-size="11" font-family="sans-serif">ON</text>
+          <text x="245" y="105" fill="#7a8a98" font-size="11" font-family="sans-serif">OFF (blank)</text>
+          <text x="365" y="22" fill="#7bc8e8" font-size="11" font-family="sans-serif">ON</text>
+          <!-- Trial marker -->
+          <line x1="110" y1="135" x2="350" y2="135" stroke="#e8a55a" stroke-width=".7"/>
+          <line x1="110" y1="131" x2="110" y2="139" stroke="#e8a55a" stroke-width=".7"/>
+          <line x1="350" y1="131" x2="350" y2="139" stroke="#e8a55a" stroke-width=".7"/>
+          <text x="225" y="148" fill="#e8a55a" font-size="11" font-family="sans-serif" text-anchor="middle">1 trial = onDuration + offDuration</text>
+        </svg>
+        <figcaption>Onset timing. The pattern appears, then disappears; the cycle repeats.</figcaption>
+      </figure>
+
+      <h3>Anti-adaptation alternation</h3>
+      <p>
+        When <code>alternatePattern</code> is enabled (on by default), every even-numbered
+        trial shows the pattern with phase inverted (light↔dark exchanged). This prevents
+        long-term luminance adaptation without changing the temporal structure or trial
+        timing. Both phases produce equivalent VEPs and can be averaged together; the log
+        records <code>phase_inverted</code> per trial so phases can be analyzed separately
+        if desired.
+      </p>
+
+      <h3>Parameters specific to Onset VEP</h3>
+      <table class="kv">
+        <tbody>
+          <tr><td><code>patternType</code></td><td>checker / radial</td><td>Default: checker</td></tr>
+          <tr><td><code>onDuration</code></td><td>ON-phase duration (ms)</td><td>Default 200, the ISCEV standard</td></tr>
+          <tr><td><code>offDuration</code></td><td>OFF-phase duration (ms)</td><td>Default 400, the ISCEV standard</td></tr>
+          <tr><td><code>nCycles</code></td><td>Number of trials</td><td>≥ 1</td></tr>
+          <tr><td><code>alternatePattern</code></td><td>Phase-invert even trials</td><td>Default: on</td></tr>
+          <tr><td><code>hexBlank</code></td><td>Blank color</td><td>Default: the pattern's mean luminance — #bcbcbc for the default pattern without a calibration</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+
+    <!-- ════════════════════════ MOTION STIMULUS ════════════════════════ -->
+    <section id="motion">
+      <h2>Motion Onset VEP <small style="font-size:.7em; color:var(--text-mute); font-weight:400;">(<a href="motion_onset_vep.html" target="vep_settings_motion" style="color:inherit; text-underline-offset:.2em;">motion_onset_vep.html</a>)</small></h2>
+
+      <p>
+        A radial sinusoidal grating that alternates between a stationary HOLD phase and
+        a moving phase. Motion is produced by smoothly advancing the global LUT phase
+        offset, giving the impression of expansion or contraction (randomized per trial).
+      </p>
+
+      <figure>
+        <svg viewBox="0 0 600 150" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0" y="0" width="600" height="150" fill="#1d2128"/>
+          <line x1="40" y1="120" x2="580" y2="120" stroke="#5a7a8a" stroke-width="1"/>
+          <text x="586" y="124" fill="#7a8a98" font-size="11" font-family="sans-serif">t</text>
+          <!-- HOLD-MOVE-HOLD-MOVE -->
+          <g stroke="#7bc8e8" stroke-width="2" fill="none">
+            <path d="M 50 90 L 200 90 L 200 30 L 280 30 L 280 90 L 430 90 L 430 30 L 510 30 L 510 90 L 580 90"/>
+          </g>
+          <text x="120" y="105" fill="#7a8a98" font-size="11" font-family="sans-serif">HOLD (static)</text>
+          <text x="225" y="22" fill="#7bc8e8" font-size="11" font-family="sans-serif">MOVE</text>
+          <text x="345" y="105" fill="#7a8a98" font-size="11" font-family="sans-serif">HOLD</text>
+          <text x="455" y="22" fill="#7bc8e8" font-size="11" font-family="sans-serif">MOVE</text>
+          <!-- Trial marker -->
+          <line x1="200" y1="135" x2="430" y2="135" stroke="#e8a55a" stroke-width=".7"/>
+          <line x1="200" y1="131" x2="200" y2="139" stroke="#e8a55a" stroke-width=".7"/>
+          <line x1="430" y1="131" x2="430" y2="139" stroke="#e8a55a" stroke-width=".7"/>
+          <text x="315" y="148" fill="#e8a55a" font-size="11" font-family="sans-serif" text-anchor="middle">1 trial = MOVE + HOLD</text>
+        </svg>
+        <figcaption>Motion onset timing. After a static HOLD, the grating moves for the configured duration, then returns to HOLD.</figcaption>
+      </figure>
+
+      <h3>Apparent speed</h3>
+      <p>
+        The temporal frequency parameter <code>temporal_freq</code> controls the rate of
+        LUT-phase advance. Because the spatial frequency varies with eccentricity (CMF
+        weighting), the apparent angular speed at radius <code>r</code> is:
+      </p>
+      <div class="math">
+        v(r)  =  temporal_freq / f(r)   [deg/s]
+      </div>
+      <p>
+        At fixation (high spatial frequency) speed is low; in the periphery (low spatial
+        frequency) speed is high. This matches cortical magnification and produces
+        approximately uniform motion energy across the visual field.
+      </p>
+
+      <h3>Parameters specific to Motion Onset</h3>
+      <table class="kv">
+        <tbody>
+          <tr><td><code>cent_freq</code> / <code>per_freq</code></td><td>c/deg at fixation / periphery</td><td>Default 1 / 0.05</td></tr>
+          <tr><td><code>temporal_freq</code></td><td>LUT-phase advance rate (Hz)</td><td>Default 5</td></tr>
+          <tr><td><code>moveDuration</code></td><td>MOVE-phase duration (ms)</td><td>Default 200</td></tr>
+          <tr><td><code>holdDuration</code></td><td>HOLD-phase duration (ms)</td><td>Default 1000</td></tr>
+          <tr><td><code>nCycles</code></td><td>Number of trials</td><td>≥ 1</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+
+    <!-- ════════════════════════ ODDBALL ════════════════════════ -->
+    <section id="oddball">
+      <h2>Oddball VEP <small style="font-size:.7em; color:var(--text-mute); font-weight:400;">(<a href="oddball_vep.html" target="vep_settings_oddball" style="color:inherit; text-underline-offset:.2em;">oddball_vep.html</a>)</small></h2>
+
+      <p>
+        A frequent <em>standard</em> and a rare <em>deviant</em> — and, if wanted, a third
+        stimulus — appear one at a time at the center of the screen, in a pseudorandom order.
+        Each trial is built like a pattern-onset trial: the stimulus is shown for the
+        <em>On duration</em>, then the background alone for the <em>Off duration</em>. The
+        sync dot lights in a different color for each stimulus, so the recording knows which
+        one was shown without any other connection to the stimulus computer.
+      </p>
+
+      <figure>
+        <svg viewBox="0 0 600 130" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0" y="0" width="600" height="130" fill="#1d2128"/>
+          <line x1="30" y1="95" x2="580" y2="95" stroke="#5a7a8a" stroke-width="1"/>
+          <text x="586" y="99" fill="#7a8a98" font-size="11" font-family="sans-serif">t</text>
+          <g font-family="sans-serif" font-size="20" font-weight="700" text-anchor="middle">
+            <text x="60"  y="70" fill="#e6ecf4">X</text><text x="125" y="70" fill="#e6ecf4">X</text>
+            <text x="190" y="70" fill="#e8a55a">O</text><text x="255" y="70" fill="#e6ecf4">X</text>
+            <text x="320" y="70" fill="#e6ecf4">X</text><text x="385" y="70" fill="#e6ecf4">X</text>
+            <text x="450" y="70" fill="#7bc8e8">+</text><text x="515" y="70" fill="#e6ecf4">X</text>
+          </g>
+          <g>
+            <rect x="54" y="102" width="12" height="8" fill="#ff5050"/><rect x="119" y="102" width="12" height="8" fill="#ff5050"/>
+            <rect x="184" y="102" width="12" height="8" fill="#50e050"/><rect x="249" y="102" width="12" height="8" fill="#ff5050"/>
+            <rect x="314" y="102" width="12" height="8" fill="#ff5050"/><rect x="379" y="102" width="12" height="8" fill="#ff5050"/>
+            <rect x="444" y="102" width="12" height="8" fill="#5080ff"/><rect x="509" y="102" width="12" height="8" fill="#ff5050"/>
+          </g>
+          <text x="300" y="24" fill="#7a8a98" font-size="11" font-family="sans-serif" text-anchor="middle">standard X · deviant O · third +, each with its own sync color</text>
+        </svg>
+        <figcaption>An oddball sequence. Every trial fires the sync dot in the color of the stimulus it shows.</figcaption>
+      </figure>
+
+      <h3>Stimuli</h3>
+      <p>
+        Each stimulus is a shape: a built-in <strong>X</strong>, <strong>O</strong> or
+        <strong>+</strong>, or a shape from an <strong>SVG file</strong>. All are drawn
+        <em>Shape height</em> degrees tall — the height of what is drawn, not of an invisible
+        frame around it — and an SVG keeps its own width-to-height ratio. <em>Stroke width</em>
+        sets the line thickness of the built-in shapes. Every shape has its own color; all share
+        one <em>Background</em>, which also fills the screen between stimuli.
+      </p>
+      <p>
+        Shapes are drawn with exactly two luminance levels, their color and the background,
+        with no smoothed edges: a smoothed edge would contain colors whose luminance the
+        calibration does not describe. Small shapes therefore have visibly stepped edges.
+      </p>
+      <p>
+        <em>Contrast</em> with <em>Apply to stimulus colors</em> sets every stimulus color to
+        that Michelson contrast against the background. The background stays where it is, since
+        all stimuli share it; each color keeps its hue and stays brighter (or darker) than the
+        background. The line below shows the contrast each stimulus actually has.
+      </p>
+      <div class="warn">
+        <strong>X and O are not equal in light.</strong> Shapes of the same height draw
+        different areas, so they emit different amounts of light, and part of a difference in
+        the response can come from that alone. The page shows each shape's size and drawn area
+        and says when the areas differ; the log and the methods text record them.
+      </div>
+
+      <h3>Using an SVG file</h3>
+      <p>
+        Choose <em>SVG file…</em> as the shape and load the file. The shape is whatever the
+        SVG paints opaquely; its own colors are ignored, and the color comes from the page,
+        where the calibration applies. Use one file per stimulus. The file is checked and
+        cleaned when it is loaded:
+      </p>
+      <ul>
+        <li><strong>Refused:</strong> text (it would be drawn with whatever fonts the computer
+          has — convert text to paths, “Object to Path” or “Create Outlines” in the editor),
+          embedded or linked images, links to anything outside the file, scripts.</li>
+        <li><strong>Removed:</strong> editor metadata, comments, titles.</li>
+        <li><strong>Size:</strong> at most 16 kB after cleaning. A plain shape is usually well
+          under 1 kB; editors add a great deal around it.</li>
+        <li><strong>Background:</strong> the file must have a transparent background. A shape
+          that fills its whole box is flagged — usually a forgotten background rectangle.</li>
+      </ul>
+      <p>
+        The cleaned SVG travels inside the link, like the calibration, so it does not have to
+        be loaded again: a condition added to the gate keeps it, and so does the protocol file.
+        The log contains the file itself and its SHA-256 fingerprint.
+      </p>
+
+      <h3>Sequence</h3>
+      <table class="kv">
+        <tbody>
+          <tr><td><em>Trials</em></td><td>All trials of the session. The standard gets whatever
+            the other stimuli leave, shown beside it.</td></tr>
+          <tr><td><em>Trials</em> of stimuli 2 and 3</td><td>Exact counts, not probabilities: the
+            session contains exactly this many.</td></tr>
+          <tr><td><em>Opening standards</em></td><td>The sequence starts with at least this many
+            standards.</td></tr>
+          <tr><td><em>Standards before each non-standard</em></td><td>At least this many standards
+            precede every deviant <em>and</em> every third stimulus, whichever came last.</td></tr>
+          <tr><td><em>Longest run of standards</em></td><td>Optional upper limit; 0 means none.</td></tr>
+          <tr><td><em>Seed</em></td><td>Fixes the order. Empty: a new order for every session,
+            with its seed shown and recorded. Type a number, or press <em>New seed</em>, to keep
+            an order.</td></tr>
+        </tbody>
+      </table>
+      <p>
+        Among all the orders that satisfy these rules, every one is equally likely. The page
+        checks the rules as you type and says when they cannot be met — for instance 40
+        deviants that each need two standards before them do not fit into 100 trials — and
+        refuses to start until they can. With a seed it shows the beginning of the order.
+      </p>
+      <details>
+        <summary>The technical version: how the order is generated</summary>
+        <p>
+          The non-standard trials split the standards into gaps. The required minimum is placed
+          in each gap first; the remaining standards are spread over the gaps as a uniformly
+          random composition, and the non-standard stimuli are put in a uniformly random order
+          (Fisher–Yates). The random numbers come from the mulberry32 generator, seeded with
+          <code>seed</code>: the same seed gives the same order in every browser. With a longest
+          run set, arrangements that break it are drawn again. The off-phase jitter comes from a
+          separate stream of the same seed, so changing the jitter never changes the order.
+        </p>
+      </details>
+
+      <h3>Timing and synchronization</h3>
+      <p>
+        <em>On duration</em> and <em>Off duration</em> are rounded to whole frames when the
+        session starts. <em>Off jitter</em> lengthens each off phase by a random 0 to that many
+        milliseconds, also in whole frames. Each trial's actual target is recorded in the log.
+      </p>
+      <p>
+        The sync dot fires at stimulus onset (and optionally offset) in the color set for that
+        stimulus in the <em>Synchronization</em> section, where each row is labeled with its
+        stimulus, shape and count. The colors are part of the environment, so the gate sets
+        them too (see <a href="#sync">Synchronization</a>). Two stimuli with the same color
+        could not be told apart, so Start is refused until they differ.
+      </p>
+      <p>
+        The fixation cross stays visible throughout and is drawn over the stimuli. A cross of
+        the same color as a stimulus disappears into it; the page warns about that.
+      </p>
+
+      <h3>Parameters specific to Oddball</h3>
+      <table class="kv">
+        <tbody>
+          <tr><td><code>shape1</code>…<code>shape3</code></td><td><code>X</code>, <code>O</code>, <code>+</code> or <code>svg</code></td><td>X, O, +</td></tr>
+          <tr><td><code>svg1</code>…<code>svg3</code>, <code>svg1_name</code>…</td><td>The cleaned SVG (URL-safe base64) and its file name</td><td>—</td></tr>
+          <tr><td><code>hexStim1</code>…<code>hexStim3</code></td><td>Stimulus colors</td><td>#ffffff</td></tr>
+          <tr><td><code>hexBlank</code></td><td>Background</td><td>#808080</td></tr>
+          <tr><td><code>useStim3</code></td><td>Use the third stimulus</td><td>false</td></tr>
+          <tr><td><code>count2</code>, <code>count3</code></td><td>Trials of stimuli 2 and 3</td><td>40, 20</td></tr>
+          <tr><td><code>shapeHeight</code>, <code>strokeWidth</code></td><td>Degrees</td><td>2, 0.25</td></tr>
+          <tr><td><code>nCycles</code></td><td>All trials</td><td>200</td></tr>
+          <tr><td><code>firstStandards</code>, <code>minStandards</code>, <code>maxStandardRun</code></td><td>Sequence rules</td><td>5, 2, 0</td></tr>
+          <tr><td><code>seed</code></td><td>Order seed (empty = new each session)</td><td>—</td></tr>
+          <tr><td><code>onDuration</code>, <code>offDuration</code>, <code>offJitter</code></td><td>Milliseconds</td><td>200, 800, 0</td></tr>
+          <tr><td><code>hexSync1</code>…<code>hexSync3</code></td><td>Sync color per stimulus (set by the gate)</td><td>#ffffff, #ff0000, #00ff00</td></tr>
+        </tbody>
+      </table>
+
+      <h3>What the log adds</h3>
+      <p>
+        <code>stimuli</code> lists each stimulus with its shape, SVG and fingerprint, color,
+        sync color, count, drawn size in pixels and degrees, drawn area, and contrast against
+        the background (with its luminance when the calibration was measured).
+        <code>sequence</code> holds the seed, the rules and the planned order as one digit per
+        trial. Each trial records which stimulus it showed, its role, its sync color, its jitter
+        and its off-phase target. The log analyzer compares the trials presented with the
+        planned order and checks the rules.
+      </p>
+    </section>
+
+
+    <!-- ════════════════════════ LOG ════════════════════════ -->
+    <section id="log">
+      <h2>Log file format</h2>
+
+      <p>
+        With <em>Save log</em> ticked, a JSON file is written when the session ends, whether it
+        ran to completion or was stopped. The download is offered by whichever window ran the
+        stimulus, and the file names itself after the session it records:
+      </p>
+
+      <pre><code>vep_flash_2026-08-07T14-32-05_subj-01.json
+vep_reversal_2026-08-07T14-32-05.json</code></pre>
+
+      <p>
+        The stimulus, then the time the session started, then the session note when there is
+        one. The timestamp comes from the log's own <code>session_start_iso</code>, not from
+        the moment of saving, so the name and the contents agree. Colons become dashes because
+        Windows forbids them in filenames, and the note is reduced to characters every
+        filesystem accepts — accented letters included, which is why a note of
+        <em>Pacient č. 12 / OD</em> arrives as <code>Pacient-12-OD</code>.
+      </p>
+
+      <div class="note">
+        <strong>The note is what tells runs apart.</strong> With several logs in one folder,
+        fill in the session note and you will not have to open files to find out which is
+        which.
+      </div>
+
+      <p>The top-level structure is the same for all of them:</p>
+
+      <pre><code>{
+  "params":      { ... all stimulus parameters, plus the session's rendering details ... },
+  "calibration": { screen_width_px, screen_width_cm, view_distance_cm, deg_per_px, ... },
+  "gamma":       { ... the display calibration in force and what follows from it ... },
+  "sync":        { dot_x, dot_y, dot_size, colour, syncDotFrames, ... },
+  "fixation":    { showFixation, radius_deg, thickness_px, colour },
+  "masks":       { central:    { enabled, radius_deg },
+                   peripheral: { enabled, radius_deg },
+                   quadrants:  { Q1_top_right: { enabled, radius_deg }, ... },
+                   colour },
+  "note":              "user-supplied free text",
+  "session_start_ms":  1735689600123,
+  "session_start_iso": "2026-01-01T00:00:00.123Z",
+  "stimulus":          "reversal",
+  "suite_version":     "1.2.0",
+  "engine_version":    "1.2.0",
+  "trials":            [ ... per-event records ... ]
+}</code></pre>
+
+      <p>
+        <code>stimulus</code> is one of <code>flash</code>, <code>reversal</code>,
+        <code>onset</code>, <code>motion</code> or <code>oddball</code>; the flash log calls its
+        event array <code>flashes</code> rather than <code>trials</code>. The oddball log has
+        no <code>masks</code> block and adds <code>stimuli</code> and <code>sequence</code>;
+        see <a href="#oddball">Oddball VEP</a>. Identity and version are separate
+        fields on purpose — one number covers the suite, so a log says both what was run and
+        which code ran it.
+      </p>
+
+      <h3>Rendering details, inside <code>params</code></h3>
+      <table>
+        <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>renderer</code></td>
+              <td><code>webgl2</code> or <code>canvas2d</code> — which path actually drew the
+                  frames, taken at the start of the session rather than read afterwards.</td></tr>
+          <tr><td><code>webgl_test</code></td>
+              <td>Result of the GPU/CPU parity check for this configuration, with the timing of
+                  60 frames. <code>null</code> when the check did not run.</td></tr>
+          <tr><td><code>pause_count</code></td>
+              <td>How many times the run was paused.</td></tr>
+          <tr><td><code>screen_info</code></td>
+              <td>What the browser reported about the display.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>The <code>gamma</code> block</h3>
+      <table>
+        <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>model</code></td>
+              <td><code>measured</code>, <code>power</code>, <code>srgb</code>, or
+                  <code>srgb_assumed</code> when no calibration was loaded.</td></tr>
+          <tr><td><code>L_max_cdm2</code>, <code>L_min_cdm2</code></td>
+              <td>The display's luminance range, from the calibration.</td></tr>
+          <tr><td><code>calibration_date</code></td><td>When the calibration was measured.</td></tr>
+          <tr><td><code>cal_source</code></td>
+              <td>The file name when one is known, otherwise <code>url</code> or
+                  <code>none</code>. This is provenance, not transport: a calibration that
+                  arrived in a link but names its file is recorded by that name.</td></tr>
+          <tr><td><code>michelson_contrast</code></td>
+              <td>Michelson contrast in luminance between the two stimulus colors — what the
+                  stimulus actually delivered, after 8-bit quantization.</td></tr>
+          <tr><td><code>luminance_basis</code></td>
+              <td><code>measured_channels</code>, <code>measured_grey_srgb_primaries</code> or
+                  <code>not_reported</code>. See
+                  <a href="#contrast">Contrast and photometry</a>.</td></tr>
+          <tr><td><code>L_flash_cdm2</code> / <code>L_blank_cdm2</code><br>
+                  <code>L_light_cdm2</code> / <code>L_dark_cdm2</code><br>
+                  <code>L_mean_cdm2</code></td>
+              <td>Estimated luminances of the two phases and their mean. Present only with a
+                  measured calibration; <code>null</code> otherwise.</td></tr>
+          <tr><td><code>dc_correction_cdm2</code></td>
+              <td>The DC shift applied to balance the phases of a radial pattern, in the same
+                  cd/m² as the fields above.</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        The luminances in the log are estimates from the calibration, not measurements made
+        during the session — see <a href="#contrast">Contrast and photometry</a>. A methods
+        section built from the log should say so, as the APA paragraph does.
+      </p>
+
+      <h3>Per-event record fields</h3>
+      <table>
+        <thead><tr><th>Field</th><th>Stimuli</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>trial</code> / <code>flash</code></td><td>all</td><td>1-based event counter</td></tr>
+          <tr><td><code>time_ms</code></td><td>flash, reversal</td><td>Elapsed ms from first event (real time)</td></tr>
+          <tr><td><code>perf_now_ms</code></td><td>flash, reversal</td><td>Raw <code>performance.now()</code> at the event</td></tr>
+          <tr><td><code>onset_ms</code> / <code>onset_perf_ms</code></td><td>onset, motion</td><td>Real-time elapsed and raw timestamp at ON / MOVE start</td></tr>
+          <tr><td><code>offset_ms</code> / <code>offset_perf_ms</code></td><td>onset, motion</td><td>Real-time elapsed and raw timestamp at OFF / HOLD start</td></tr>
+          <tr><td><code>frame</code></td><td>flash</td><td>p5 frame counter</td></tr>
+          <tr><td><code>frames</code></td><td>motion</td><td>Number of frames during MOVE phase</td></tr>
+          <tr><td><code>flash_duration_ms</code></td><td>flash</td><td>Expected flash duration at measured FPS</td></tr>
+          <tr><td><code>half_period_ms</code></td><td>reversal</td><td>Configured time between reversals</td></tr>
+          <tr><td><code>on_duration_ms</code> / <code>off_duration_ms</code></td><td>onset</td><td>Configured ON / OFF durations</td></tr>
+          <tr><td><code>move_duration_ms</code></td><td>motion</td><td>Real measured MOVE duration</td></tr>
+          <tr><td><code>phase</code></td><td>reversal</td><td>'A' (odd trials) / 'B' (even trials)</td></tr>
+          <tr><td><code>phase_inverted</code></td><td>onset</td><td>Boolean — true on alternation trials</td></tr>
+          <tr><td><code>direction</code></td><td>motion</td><td>+1 = expand, −1 = contract</td></tr>
+        </tbody>
+      </table>
+
+      <div class="note">
+        <strong>Software timestamps are not photon timestamps.</strong> All
+        <code>*_ms</code> and <code>*_perf_ms</code> fields come from
+        <code>performance.now()</code> at the moment the event handler runs. Browsers
+        deliberately coarsen that clock — to 0.1&nbsp;ms in Chrome, and to as much as
+        1&nbsp;ms in some other browsers — and the moment recorded is when the frame was
+        requested, not when it reached the screen. For the time light left the display, use
+        the photodiode signal in your recording.
+      </div>
+
+      <h3>Log analyzer</h3>
+      <p>
+        <a href="vep_log_analyzer.html" target="vep_analyzer"><code>vep_log_analyzer.html</code></a>
+        reads any of these files and reports descriptive statistics — median, IQR,
+        MAD (×1.4826), mean ± SD, n, min, max — with the deviation from the configured target,
+        and an APA paragraph that can be copied out. Everything happens in the browser; nothing
+        is uploaded.
+      </p>
+      <p>
+        Beside the timing it restates the session itself: the stimulus and the suite and engine
+        versions, the renderer and its parity result, the number of pauses, the calibration
+        with its type, date and source, the Michelson contrast, the luminance basis and the
+        estimated luminances. Fields a log does not carry are shown as
+        <em>(not recorded)</em> rather than left blank.
+      </p>
+      <p>
+        Stimulus-specific metrics it derives from the log:
+      </p>
+      <ul>
+        <li><strong>Flash:</strong> inter-flash interval (vs. 1000/flashFreq), flash duration</li>
+        <li><strong>Reversal:</strong> inter-reversal interval (vs. half-period)</li>
+        <li><strong>Onset:</strong> real ON duration, real OFF duration, trial period</li>
+        <li><strong>Motion:</strong> real MOVE duration, real HOLD duration, frames per MOVE,
+          plus direction balance (expanding vs. contracting)</li>
+      </ul>
+    </section>
+
+
+    <!-- ════════════════════════ APA ════════════════════════ -->
+    <section id="apa">
+      <h2>APA description</h2>
+
+      <p>
+        Below each stimulus form, under <em>APA-style report</em>, the page shows a methods
+        paragraph written from the settings actually in force; a click copies it to the
+        clipboard. It is written
+        from the same values as the log, so the two cannot disagree. The structure is the same
+        across all stimuli:
+      </p>
+
+      <ol>
+        <li>Stimulus type and pattern properties, with the colors used</li>
+        <li>Temporal parameters and total stimulation time</li>
+        <li>The interval before the first stimulus and after the last</li>
+        <li>Display geometry: pixels, centimeters, viewing distance, visual field in degrees,
+          pixels per degree, and the frame rate with how it was obtained</li>
+        <li>Synchronization patch, fixation cross and active masks, where used</li>
+        <li>The display calibration, the contrast delivered (in percent), and — with a
+          measured calibration — the estimated luminances</li>
+        <li>Which renderer drew the frames</li>
+        <li>Operator pauses, if any</li>
+      </ol>
+
+      <p>
+        <strong>The paragraph cites no literature.</strong> It describes the settings that were
+        used and nothing beyond them. A reference to the ISCEV standard or to the motion-onset
+        recommendations would hold only if the parameters follow them, and the page cannot know
+        whether they do — whether a configuration conforms depends on the protocol rather than
+        on the software. Add the references yourself where they apply: they are listed in
+        <a href="#citation">Citation &amp; license</a>, together with what the ISCEV standard
+        does and does not settle here.
+      </p>
+
+      <h3>What it says about luminance, and why</h3>
+
+      <p>
+        The wording around photometry is deliberate, because this is where a methods section
+        can most easily claim more than was done.
+      </p>
+
+      <ul>
+        <li><strong>With no calibration</strong> it states that none was in force, that sRGB
+          was assumed, that luminances are relative, and gives the contrast under that
+          assumption. Nothing is quietly omitted.</li>
+        <li><strong>With a calibration</strong> it names the model and L<sub>max</sub> and
+          gives the Michelson contrast in luminance.</li>
+        <li><strong>With a measured calibration</strong> it adds the phase luminances and their
+          mean, and says in the same sentence that these are estimates derived from the display
+          calibration and not photometric measurements of the session.</li>
+        <li><strong>Where the primaries were not measured individually</strong> it says so and
+          cites the BT.709 / sRGB coefficients it used instead, so a reader can judge how far
+          a chromatic or isoluminant claim rests on assumption.</li>
+      </ul>
+
+      <div class="note">
+        <strong>The contrast reported is the contrast delivered.</strong> It is computed from
+        the colors as they stand, after 8-bit quantization — not from a target you asked for.
+        If you set 50 % and the display could only reach 49.9 %, the paragraph says 49.9 %.
+      </div>
+    </section>
+
+
+    <!-- ════════════════════════ URL PARAMS ════════════════════════ -->
+    <section id="urlparams">
+      <h2>URL parameters</h2>
+
+      <p>
+        Every field on a stimulus page corresponds to a query parameter, and the link the page
+        shows contains all of them. Reading and writing are symmetric: whatever a page puts in
+        the link, it also reads back, so a copied link reopens as the condition it was copied
+        from. That is what makes the link usable as a preset, a protocol entry, or the way the
+        gate and the stimulus window are handed a configuration.
+      </p>
+
+      <h3>Set by the gate</h3>
+      <p>
+        These describe the environment. When a condition is launched from the gate, the gate
+        writes its own values for them, whatever the stored link said.
+      </p>
+      <pre><code>screen_width_px      pixels        e.g. 1920 (CSS pixels, not the panel's native resolution)
+screen_width_cm      cm            e.g. 53
+view_distance_cm     cm            e.g. 57
+displayRefreshHz     Hz            optional; what the OS reports for the presentation display
+useFullscreen        bool          true / false
+dot_x, dot_y         pixels        sync dot position
+dotSize              pixels        sync dot side length (square)
+hexSync1             #rrggbb       sync dot colour when it fires (default #ffffff)
+hexSync2, hexSync3   #rrggbb       oddball only: the dot for the second and third stimulus
+                                   (defaults #ff0000, #00ff00)
+syncDotFrames        frames        sync flash duration
+note                 string        session note, written into the log
+enableLogging        bool
+cal                  base64        the whole calibration object
+cal_name             string        file the calibration came from, when known</code></pre>
+
+      <h3>On every stimulus page, owned by the condition</h3>
+      <pre><code>startDelay           ms            pre-stimulus delay, also the post-stimulus baseline
+showFixation         bool
+fixationRadius       degrees
+fixationThickness    pixels
+maskCentral          bool
+maskCentralRad       degrees
+maskPeripheral       bool
+maskPeripheralRad    degrees
+maskQ1..4            bool          quadrant masks
+maskQ1Rad..Q4Rad     degrees
+hexFixation          #rrggbb
+hexMask              #rrggbb</code></pre>
+
+      <h3>Per stimulus</h3>
+      <table>
+        <thead><tr><th>Stimulus</th><th>Parameters</th></tr></thead>
+        <tbody>
+          <tr><td>Flash</td>
+              <td><code>flashFreq</code>, <code>flashFrames</code>, <code>nFlashes</code>,
+                  <code>hexFlash</code>, <code>hexBlank</code>, <code>syncOnFlash</code></td></tr>
+          <tr><td>Reversal</td>
+              <td><code>patternType</code>, <code>reversalsPerSec</code>, <code>nCycles</code>,
+                  <code>checkSize</code>, <code>cent_freq</code>, <code>per_freq</code>,
+                  <code>hexLight</code>, <code>hexDark</code>, <code>syncOnReversal</code></td></tr>
+          <tr><td>Onset</td>
+              <td><code>patternType</code>, <code>onDuration</code>, <code>offDuration</code>,
+                  <code>nCycles</code>, <code>alternatePattern</code>, <code>checkSize</code>,
+                  <code>cent_freq</code>, <code>per_freq</code>, <code>hexLight</code>,
+                  <code>hexDark</code>, <code>hexBlank</code>, <code>syncOnOnset</code>,
+                  <code>syncOnOffset</code></td></tr>
+          <tr><td>Motion</td>
+              <td><code>cent_freq</code>, <code>per_freq</code>, <code>temporal_freq</code>,
+                  <code>moveDuration</code>, <code>holdDuration</code>, <code>nCycles</code>,
+                  <code>hexLight</code>, <code>hexDark</code>, <code>syncOnOnset</code>,
+                  <code>syncOnOffset</code></td></tr>
+          <tr><td>Oddball</td>
+              <td><code>shape1</code>&ndash;<code>shape3</code>, <code>svg1</code>&ndash;<code>svg3</code>,
+                  <code>svg1_name</code>&ndash;<code>svg3_name</code>, <code>hexStim1</code>&ndash;<code>hexStim3</code>,
+                  <code>hexBlank</code>, <code>useStim3</code>, <code>count2</code>, <code>count3</code>,
+                  <code>shapeHeight</code>, <code>strokeWidth</code>, <code>targetContrast</code>,
+                  <code>nCycles</code>, <code>firstStandards</code>, <code>minStandards</code>,
+                  <code>maxStandardRun</code>, <code>seed</code>, <code>onDuration</code>,
+                  <code>offDuration</code>, <code>offJitter</code>, <code>syncOnOnset</code>,
+                  <code>syncOnOffset</code>; sync colors <code>hexSync2</code>, <code>hexSync3</code>
+                  besides <code>hexSync1</code>. No masks.</td></tr>
+        </tbody>
+      </table>
+
+      <div class="note">
+        <strong>There is no contrast parameter.</strong> The contrast of a pattern is the
+        Michelson contrast between its two colors, so the colors in the link are the
+        contrast. Setting a target with <em>Apply to colors</em> writes those colors; nothing
+        separate is stored or transmitted. See <a href="#contrast">Contrast and photometry</a>.
+      </div>
+
+      <h3>Parameters not on any form</h3>
+      <pre><code>webgl=0              force the Canvas 2D renderer instead of WebGL 2
+parity=1             run the GPU/CPU comparison used by the parity test page
+autostart=true       open on the ready card that Run in the protocol uses
+theme=light|dark     colour theme of the page's controls</code></pre>
+
+      <p>
+        <code>theme</code> is how one page of the suite hands its light or dark setting to
+        the next. Over <code>file://</code> each file keeps its own browser storage, so a
+        stimulus page opened from a light gate would otherwise start dark. Every link from
+        one page of the suite to another carries it, including the launch tiles and Run and
+        Page in the protocol. A page opened on its own follows the stored choice and then the
+        system setting. The theme affects the controls only — never the stimulus — so it is
+        not part of the reproducible link a stimulus page shows, and a condition saved in the
+        protocol does not keep it.
+      </p>
+
+      <details>
+        <summary>Example preset URLs</summary>
+        <pre><code># Checkerboard reversal at 2 reversals/s, 100 reversals, full-screen, central mask
+pattern_reversal_vep.html
+  ?patternType=checker
+  &amp;reversalsPerSec=2
+  &amp;nCycles=100
+  &amp;checkSize=1
+  &amp;hexLight=%23ffffff
+  &amp;hexDark=%23000000
+  &amp;useFullscreen=true
+  &amp;maskCentral=true
+  &amp;maskCentralRad=2
+
+# Flash VEP, 2 Hz, 2-frame flash, 200 flashes
+flash_vep.html
+  ?flashFreq=2
+  &amp;flashFrames=2
+  &amp;nFlashes=200
+  &amp;useFullscreen=true</code></pre>
+        <p>
+          Line breaks are shown for readability; in a real URL the parameters run together
+          separated by <code>&amp;</code>. A <code>#</code> in a color has to be written as
+          <code>%23</code> when a URL is typed by hand — the pages produce this encoding
+          themselves.
+        </p>
+      </details>
+
+      <details>
+        <summary>Why the calibration travels in the link rather than in storage</summary>
+        <p>
+          <code>cal</code> holds the entire calibration object, base64-encoded. A full measured
+          RGB calibration comes to roughly 1 600 characters and a complete stimulus link to
+          about 2 300, which every current browser accepts without difficulty.
+        </p>
+        <p>
+          Carrying it this way is what makes a link self-contained and what makes the suite
+          work from <code>file://</code>, where browser storage is not shared between files.
+          <code>cal_name</code> travels beside it so the log can name the file the calibration
+          came from instead of merely recording that something arrived in a link.
+        </p>
+      </details>
+    </section>
+
+
+    <!-- ════════════════════════ TROUBLESHOOTING ════════════════════════ -->
+    <section id="troubleshooting">
+      <h2>Troubleshooting</h2>
+
+      <h3>Starting a session</h3>
+
+      <details>
+        <summary>Start is grayed out and will not respond</summary>
+        <p>
+          With <em>Fullscreen</em> ticked, Start stays locked until the presenting window
+          reports that it really is full-screen. Click once inside the stimulus window, or
+          press <kbd>F</kbd> there. If you opened a separate window, it is that window which
+          has to be full-screen, not the settings window.
+        </p>
+        <p>
+          The check accepts an OS-maximized window and a macOS virtual desktop as well as the
+          browser's own full-screen mode — what it will not accept is a window with anything
+          visible around it. If you deliberately want to present in a window, untick
+          <em>Fullscreen</em> and Start unlocks.
+        </p>
+      </details>
+
+      <details>
+        <summary>The stimulus window is stuck on “starting…”</summary>
+        <p>
+          The settings window has asked the stimulus window to begin and is waiting for it to
+          confirm. Check the stimulus window is still open and was not reloaded independently;
+          closing it and pressing <em>↗ New window</em> again re-establishes the connection.
+        </p>
+      </details>
+
+      <details>
+        <summary>Ticking Fullscreen does nothing to the open stimulus window</summary>
+        <p>
+          It does reach that window, but a browser only grants full-screen to a window in
+          response to something done <em>in that window</em>. The prompt appears there; one
+          click or <kbd>F</kbd> completes it. There is no need to close and reopen the window.
+        </p>
+      </details>
+
+      <details>
+        <summary>The stimulus window opens blank, or does not open at all</summary>
+        <p>
+          Popups have to be permitted for the page. Allow them for this file or site and press
+          <em>↗ New window</em> again.
+        </p>
+      </details>
+
+      <h3>Calibration</h3>
+
+      <details>
+        <summary>The gate says there is no calibration, though one was saved</summary>
+        <p>
+          What the gate remembers is browser storage, and it is discarded by clearing browsing
+          data, by using a private window, by switching browser, profile or machine, and in
+          Safari after about a week without interaction. Load the <code>.json</code> again, or
+          open the link you saved with the calibration in it. This is why the file and the link
+          are the durable forms and the memory is only a shortcut.
+        </p>
+      </details>
+
+      <details>
+        <summary>The calibration page saved, but the stimuli do not see it</summary>
+        <p>
+          Opened as <code>file://</code>, each file is its own storage origin, so nothing saved
+          by one page is visible to another. Use <em>Open gate with this calibration</em>, or
+          download the <code>.json</code> and load it in the gate or on the stimulus page. The
+          calibration then travels in the link, which has no such restriction.
+        </p>
+      </details>
+
+      <details>
+        <summary>The gate reports that <code>vep_engine.js</code> could not be loaded</summary>
+        <p>
+          The engine file has to sit in the same folder as the gate and the stimuli. Without it
+          the gate cannot encode a calibration into a link, so it stops rather than build links
+          that silently lack one.
+        </p>
+      </details>
+
+      <details>
+        <summary>Mean luminance is in the wrong units, or a value looks absurd</summary>
+        <p>
+          The field is in cd/m² with a calibration loaded and in relative units of full scale
+          without one; the label beside it says which. Loading a calibration converts your
+          value so it keeps the same fraction of the display's range — it is not overwritten
+          with a default. Clearing the field and leaving it empty makes the page suggest half of
+          L<sub>max</sub>.
+        </p>
+      </details>
+
+      <h3>Colors and contrast</h3>
+
+      <details>
+        <summary><em>Apply to colors</em> refuses with “outside the display range”</summary>
+        <p>
+          The requested pair cannot be shown: a high contrast about a mean luminance close to
+          L<sub>max</sub> needs a bright phase brighter than the panel can emit, and a mean
+          close to black needs a dark phase below its black level. The message names the
+          channel that ran out of headroom. Lower the contrast, move the mean luminance towards
+          the middle of the range, or choose a less saturated color — a saturated primary has
+          much less headroom than white.
+        </p>
+      </details>
+
+      <details>
+        <summary>Asking for 0 % contrast on a red / green pair changes almost nothing</summary>
+        <p>
+          Check the line under the button. If it ends with
+          <em>R/G/B assumed from sRGB primaries</em>, the display's primaries were never
+          measured and their relative luminances are being assumed. The result is a reasonable
+          approximation on a standard panel and can be some way off on a wide-gamut one.
+          Measure the R, G and B channels in the calibration page for chromatic work.
+        </p>
+      </details>
+
+      <details>
+        <summary>The contrast in the log is not the number I typed</summary>
+        <p>
+          It is not meant to be. What is logged is the contrast the colors actually deliver
+          after rounding to 8-bit values, which is usually a fraction of a percent from the
+          request. Nothing stores the requested figure — the colors are the stimulus, and the
+          log describes the stimulus.
+        </p>
+      </details>
+
+      <details>
+        <summary>A copied link opens with different colors</summary>
+        <p>
+          It should not: every stimulus writes its colors into the link and reads them back.
+          If it happens, check that the whole link was copied — the calibration parameter alone
+          runs to well over a thousand characters, and a link truncated by an email client or a
+          chat window will lose whatever came after the cut.
+        </p>
+      </details>
+
+      <h3>Display and timing</h3>
+
+      <details>
+        <summary>The frame rate measurement reads ~120 Hz on a 60 Hz monitor</summary>
+        <p>
+          Some browsers drive <code>requestAnimationFrame</code> at 120 Hz on modern systems.
+          Check the actual refresh rate in the operating system's display settings and that the
+          browser's compositor matches it. The measured value is what the timing calculations
+          use, so a wrong reading propagates into every frame-locked duration.
+        </p>
+      </details>
+
+      <details>
+        <summary>The pattern looks pixelated or aliased near fixation</summary>
+        <p>
+          For the radial grating, high central frequencies (<code>cent_freq</code> above about
+          4 c/deg at low pixels-per-degree) produce moiré near the center. Reduce
+          <code>cent_freq</code>, increase the central mask radius, or increase the viewing
+          distance. The checkerboard is not affected.
+        </p>
+      </details>
+
+      <details>
+        <summary>The log says <code>canvas2d</code> though WebGL is available</summary>
+        <p>
+          The stimulus checks that the GPU shader reproduces the CPU reference for the exact
+          configuration in use, and falls back to Canvas 2D when it does not. That is the
+          intended behavior: the same stimulus is presented either way, only more slowly.
+          <a href="webgl_parity_test.html" target="vep_parity_test">The parity test page</a> shows which
+          configuration failed and by how much. <code>&amp;webgl=0</code> forces the CPU path
+          deliberately.
+        </p>
+      </details>
+
+      <details>
+        <summary>Sync dot does not trigger the photodiode</summary>
+        <p>
+          Check three things in order. That the photodiode sits over the dot's pixel
+          coordinates — 32, 32 by default, in the top-left corner. That the on-time in frames
+          is long enough for the amplifier's rise time; try 4 frames if 2 is too brief. And that
+          the sync event flag for this stimulus is enabled, for instance
+          <code>syncOnReversal</code> for pattern reversal. If the dot color was changed from
+          white, check also that the photodiode responds to it: a single primary is much
+          darker than white.
+        </p>
+      </details>
+
+      <h3>Files and output</h3>
+
+      <details>
+        <summary>The log download is blocked</summary>
+        <p>
+          Running from <code>file://</code>, some browsers show a warning bar before allowing a
+          download. Accept it. Served from a web server, the prompt does not appear.
+        </p>
+      </details>
+
+      <details>
+        <summary>Copying the URL or the APA paragraph fails</summary>
+        <p>
+          Clipboard access needs a recent user gesture and a secure context. The text is always
+          shown on the page as well, so it can be selected and copied by hand.
+        </p>
+      </details>
+
+      <details>
+        <summary>Which log belongs to which run?</summary>
+        <p>
+          The file name carries the stimulus, the session's start time and the session note, so
+          runs in one folder identify themselves without being opened. If the note was left
+          empty the timestamp still separates them, and <code>session_start_iso</code> inside
+          the file gives the same moment to the millisecond.
+        </p>
+      </details>
+    </section>
+
+
+    <!-- ════════════════════════ CITATION ════════════════════════ -->
+    <!-- ════════════════════════ APPENDIX ════════════════════════ -->
+    <section id="appendix">
+      <h2>Appendix</h2>
+
+      <h3 id="checklist">Session checklist</h3>
+
+      <p>
+        Everything below is recoverable if forgotten — except the things that are not. Those
+        are marked.
+      </p>
+
+      <table>
+        <thead><tr><th>Before recording</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>Calibration dated within 30 days, and measured if you will report luminance</td>
+              <td><strong>Not recoverable.</strong> A contrast in cd/m² cannot be reconstructed
+                  afterwards from a session run without a calibration.</td></tr>
+          <tr><td>R, G and B measured if the stimulus is chromatic</td>
+              <td><strong>Not recoverable.</strong> Isoluminance set under assumed primaries
+                  cannot be re-derived later.</td></tr>
+          <tr><td>Screen width in pixels and centimeters, and viewing distance</td>
+              <td>Everything in degrees depends on these. Wrong values give a stimulus of the
+                  wrong size and a log that does not say so.</td></tr>
+          <tr><td>Parity test run once for this configuration</td>
+              <td>Tells you in advance whether the GPU path will be used or the slower fallback
+                  taken.</td></tr>
+          <tr><td>Session note filled in</td>
+              <td>The only field that distinguishes one log from another at a glance.</td></tr>
+          <tr><td><em>Save log</em> ticked</td>
+              <td><strong>Not recoverable.</strong> No log is written retrospectively.</td></tr>
+          <tr><td>Stimulus window on the presentation screen and full-screen</td>
+              <td>Anything else visible around the stimulus changes the mean luminance and adds
+                  contours, and neither appears in the log.</td></tr>
+          <tr><td>Photodiode over the sync dot, on-time long enough for the amplifier</td>
+              <td><strong>Not recoverable.</strong> Software timestamps are not a substitute for
+                  the photodiode trace.</td></tr>
+        </tbody>
+      </table>
+
+      <table>
+        <thead><tr><th>After recording</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>Keep the log with the EEG data</td>
+              <td>It carries the parameters, the calibration and the renderer.</td></tr>
+          <tr><td>Keep the calibration <code>.json</code></td>
+              <td>The log names the file; the file itself holds the measurements.</td></tr>
+          <tr><td>Keep the stimulus link</td>
+              <td>Reproduces the condition without reconstructing it by hand.</td></tr>
+          <tr><td>Copy the APA paragraph</td>
+              <td>Written from the same values as the log, with its citations already in it.</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="protocol">Window protocol</h3>
+
+      <p>
+        When the stimulus runs in a separate window, the two windows talk over
+        <code>postMessage</code>. This matters if you are reading the source or diagnosing a
+        window that will not start.
+      </p>
+
+      <details>
+        <summary>Messages and what they carry</summary>
+        <p><strong>Settings window to stimulus window:</strong></p>
+        <table>
+          <thead><tr><th>Message</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>vep_hello</code></td><td>Handshake after the window opens.</td></tr>
+            <tr><td><code>vep_start</code></td><td>Begin. Carries a snapshot of the form, plus the calibration and its file name, so what is presented is what the settings window had at the moment Start was pressed.</td></tr>
+            <tr><td><code>vep_pause_toggle</code></td><td>Pause or resume.</td></tr>
+            <tr><td><code>vep_stop</code></td><td>Abort.</td></tr>
+            <tr><td><code>vep_fullscreen_pref</code></td><td>The Fullscreen checkbox changed. The stimulus window arms its click / <kbd>F</kbd> affordance and shows or hides the prompt.</td></tr>
+          </tbody>
+        </table>
+        <p><strong>Stimulus window to settings window:</strong></p>
+        <table>
+          <thead><tr><th>Message</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>vep_ready</code></td><td>Loaded and able to accept commands.</td></tr>
+            <tr><td><code>vep_geometry</code></td><td>Its size and whether it is effectively full-screen. This is what unlocks Start.</td></tr>
+            <tr><td><code>vep_fps</code>, <code>vep_measuring</code></td><td>Frame-rate measurement in progress and its result.</td></tr>
+            <tr><td><code>vep_running</code>, <code>vep_progress</code>, <code>vep_tail</code></td><td>Started (naming the renderer), progress, and entry into the post-stimulus baseline.</td></tr>
+            <tr><td><code>vep_paused</code>, <code>vep_resumed</code></td><td>Pause state changes.</td></tr>
+            <tr><td><code>vep_done</code>, <code>vep_aborted</code></td><td>Finished or stopped. Sent whether or not a log was requested, so the settings window always returns to its resting state.</td></tr>
+            <tr><td><code>vep_busy</code></td><td>A start was requested while a previous run was still finishing.</td></tr>
+            <tr><td><code>vep_fullscreen_denied</code></td><td>Full-screen was refused by the browser.</td></tr>
+          </tbody>
+        </table>
+        <p>
+          The calibration travels twice by design: in the URL when the window is opened, and
+          again with <code>vep_start</code>. The second is what lets a calibration loaded after
+          the window was opened still reach it, without closing and reopening.
+        </p>
+      </details>
+
+      <h3 id="limits">What is and is not verified</h3>
+
+      <p>
+        Some properties of this suite have been checked systematically and some rest on
+        judgment. The distinction is worth stating, because it tells you where to look first
+        when something behaves unexpectedly.
+      </p>
+
+      <ul>
+        <li><strong>Checked by simulation:</strong> the timing state machines, the frame
+          counting model of each stimulus, the full-screen decision table, the contrast solver
+          across color pairs and edge cases, the luminance model against measured and assumed
+          channel data, and the round trip of the calibration through a URL.</li>
+        <li><strong>Checked statically:</strong> that every message sent has a handler, that no
+          element identifier is duplicated, that the markup is balanced, and that what each page
+          writes into a link it also reads back.</li>
+        <li><strong>Established by measurement, by you:</strong> everything photometric. The
+          suite computes from the numbers you supply; it does not measure the display.</li>
+        <li><strong>Established by looking at the screen:</strong> rendering, appearance, real
+          timing on real hardware, and browser behavior. No amount of static checking
+          substitutes for running the stimulus on the machine that will record it.</li>
+      </ul>
+
+      <div class="note">
+        <strong>Durations rest on the measured refresh rate.</strong> Frame-locked durations
+        are computed from the rate measured at the start of the session. Software timestamps come from <code>performance.now()</code> at the moment the
+        event handler runs, which is the closest the browser can report — but it is when the
+        instruction was issued, not when the photons left the display. For timing that has to
+        withstand scrutiny, the photodiode trace is the measurement and the log is the
+        annotation.
+      </div>
+    </section>
+
+    <section id="citation">
+      <h2>Citation &amp; license</h2>
+
+      <p>
+        <strong>About the name.</strong> VEPeagle contracts VEP and <em>eagle</em>. The eagle
+        is the Orlice, the river that joins the Elbe at Hradec Králové where the
+        suite was written; <em>orlice</em> is Czech for a female eagle. Write the name as
+        <strong>VEPeagle</strong> in prose, and <code>vepeagle</code> wherever it becomes a
+        repository name, a file name or part of a URL.
+      </p>
+
+      <p><strong>Software citation:</strong></p>
+      <!-- TODO before release: add the Zenodo DOI line once the release is archived. -->
+      <pre><code>Kremlacek, J. (2026). VEPeagle: a browser-based visual evoked potential
+stimulus suite (Version 1.2.0) [Computer software]. MIT License.
+https://github.com/Jan-Kremlacek/vepeagle</code></pre>
+
+      <p>
+        One version number covers the whole suite. The files are only ever used together, so
+        a per-file version would identify nothing useful; every log records
+        <code>suite_version</code> and <code>engine_version</code> so a recording can be
+        matched to the code that produced it.
+      </p>
+
+      <h3>Standards and sources the stimuli follow</h3>
+
+      <p>
+        Flash, pattern reversal and pattern onset are the paradigms covered by the ISCEV
+        standard, and it is the reference to consult when planning a clinical recording: it
+        specifies field size, check size, contrast, reversal rate and the rest of what a
+        conforming protocol looks like.
+      </p>
+
+      <div class="warn">
+        <strong>The suite does not enforce those values and does not check a configuration
+        against them.</strong> Every parameter is yours to set, which is what makes the pages
+        useful for research outside the standard as well as for clinical work inside it. The
+        stimulus pages therefore do not claim conformity in the methods paragraph they
+        generate — whether a given setting conforms is a judgment about your protocol, not a
+        property of the software. Cite the standard where your protocol follows it, and say
+        where it departs.
+      </div>
+      <p style="padding-left: 1em; border-left: 2px solid var(--border-accent); color: var(--text-soft);">
+        Šuštar Habjan, M., Bach, M., van Genderen, M. M., Li, S., Mizota, A., Nilsson, J.,
+        Thompson, D. A., &amp; Robson, A. G. (2025). ISCEV standard for clinical visual evoked
+        potentials (2025 update). <em>Documenta Ophthalmologica</em>, 151(2), 97–112.
+        <a href="https://doi.org/10.1007/s10633-025-10042-1" target="_blank">https://doi.org/10.1007/s10633-025-10042-1</a>
+      </p>
+
+      <p>
+        Motion onset lies outside the ISCEV standard. It follows the methodology described in:
+      </p>
+      <p style="padding-left: 1em; border-left: 2px solid var(--border-accent); color: var(--text-soft);">
+        Kuba, M., Kubová, Z., Kremláček, J., &amp; Langrová, J. (2007). Motion-onset VEPs:
+        characteristics, methods, and diagnostic use. <em>Vision Research</em>, 47(2), 189–202.
+        <a href="https://doi.org/10.1016/j.visres.2006.09.020" target="_blank">https://doi.org/10.1016/j.visres.2006.09.020</a>
+      </p>
+
+      <p>The radial motion stimulus in particular draws on:</p>
+      <p style="padding-left: 1em; border-left: 2px solid var(--border-accent); color: var(--text-soft);">
+        Kremláček, J., Kuba, M., Kubová, Z., Chlubnová, J., &amp; Szanyi, J. (2004).
+        Motion-onset VEPs to translating, radial, rotating and spiral stimuli.
+        <em>Documenta Ophthalmologica</em>, 109, 169–175.
+        <a href="https://doi.org/10.1007/s10633-004-4048-7" target="_blank">https://doi.org/10.1007/s10633-004-4048-7</a>
+      </p>
+
+      <p>Colorimetry, where luminances are reported without per-channel measurement:</p>
+      <p style="padding-left: 1em; border-left: 2px solid var(--border-accent); color: var(--text-soft);">
+        Recommendation ITU-R BT.709-6 (2015). <em>Parameter values for the HDTV standards for
+        production and international program exchange.</em> International Telecommunication
+        Union.<br>
+        IEC 61966-2-1:1999. <em>Multimedia systems and equipment — Color measurement and
+        management — Part 2-1: Color management — Default RGB color space — sRGB.</em>
+      </p>
+
+      <h3>How this software was written</h3>
+
+      <p>
+        The suite was developed by the author working with Claude, an AI assistant made by
+        Anthropic. The division of work is worth stating plainly, because it bears on what
+        the code has and has not been checked against.
+      </p>
+
+      <p>
+        The author set every requirement and made every design decision, supplied the domain
+        knowledge — the stimulus definitions, the calibration procedure, what may and may not
+        be reported as a measurement — and tested each revision on the actual recording
+        hardware. The assistant wrote and revised the code to those decisions, and verified it
+        by static checks and by simulating the timing, state machines and photometric
+        calculations outside the browser.
+      </p>
+
+      <p>
+        That last point is the limitation to keep in mind: <strong>the assistant never ran the
+        software in a browser.</strong> Everything about real rendering, real timing on real
+        hardware and real appearance rests on the author's testing, not on the assistant's
+        verification. Behavior that only shows itself on screen was found by looking at the
+        screen.
+      </p>
+
+      <p>
+        No part of the calibration or the reported photometry is generated by the assistant at
+        run time. The numbers in a log come from the display measurements you make and the
+        transfer functions computed from them.
+      </p>
+
+      <p><strong>License:</strong> MIT — see file headers for full text.</p>
+    </section>
+
+
+    <!-- ════════════════════════ FOOTER ════════════════════════ -->
+    <div class="doc-footer">
+      <span>VEPeagle — Manual v1.2.0</span>
+      <span>&copy; 2026 Jan Kremlacek &mdash; MIT License</span>
+    </div>
+
+  </main>
+
+</div>
+
+<script>
+/* ── Theme toggle (manual) ── */
+(function () {
+  var KEY  = 'vep_theme';
+  var SUN  = '\u2600';
+  var MOON = '\u25D7';
+  function applyTheme(t) {
+    document.documentElement.setAttribute('data-theme', t || 'dark');
+    var btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.textContent = (t === 'light') ? MOON : SUN;
+  }
+  /* The bootstrap in <head> has already resolved the theme; follow it rather
+     than reading the store again, which would undo a theme passed in the URL. */
+  applyTheme(document.documentElement.getAttribute('data-theme') || 'dark');
+  document.addEventListener('DOMContentLoaded', function () {
+    applyTheme(document.documentElement.getAttribute('data-theme') || 'dark');
+    var btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.addEventListener('click', function () {
+      var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      try { localStorage.setItem(KEY, next); } catch (e) {}
+      applyTheme(next);
+    });
+
+    /* Hand the theme to the next page of the suite. The href is rewritten on
+       the way out, so links the page rebuilds at runtime are covered too. */
+    document.addEventListener('click', function (e) {
+      var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+      if (!a) return;
+      var href = a.getAttribute('href') || '';
+      if (!href || href.charAt(0) === '#') return;
+      var u;
+      try { u = new URL(a.href, location.href); } catch (err) { return; }
+      if (u.protocol !== location.protocol || !/\.html$/i.test(u.pathname)) return;
+      u.searchParams.set('theme', document.documentElement.getAttribute('data-theme') || 'dark');
+      a.href = u.toString();
+    }, true);
+  });
+})();
+
+</script>
+</body>
+</html>

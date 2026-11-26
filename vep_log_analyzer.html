@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<!--
+  VEP Log Analyzer
+  ================
+  Author : Jan Kremlacek
+  Version: 1.2.0
+  License: MIT
+
+  Description
+  -----------
+  Reads a JSON log file produced by any of the five VEP stimuli and computes
+  descriptive timing statistics:
+    • Median + IQR + MAD (robust)
+    • Mean ± SD (parametric)
+    • n, min, max
+  Generates a descriptive table and an APA-style methods/results paragraph.
+
+  Detected stimulus types and metrics:
+    Flash     : inter-flash interval, flash duration
+    Reversal  : inter-reversal interval, half-period error
+    Onset     : real ON duration, real OFF duration, real trial duration
+    Motion    : real MOVE duration, real HOLD duration, frame count
+    Oddball   : ON duration per stimulus, OFF duration vs per-trial target,
+                onset-to-onset interval; presented vs planned sequence
+
+  All processing happens client-side; no log data leaves the browser.
+-->
+<html lang="en" class="page-analyzer">
+<head>
+  <meta charset="UTF-8" />
+  <script>(function(){
+    /* Theme, in order of precedence: the ?theme= parameter another page of the
+       suite passed on, the choice stored here, the system preference. Over
+       file:// the store is per-page, so the parameter is the only way across. */
+    var q = new URLSearchParams(location.search).get('theme');
+    var t = (q === 'light' || q === 'dark') ? q : null;
+    try { t = t || localStorage.getItem('vep_theme'); } catch (e) {}
+    if (!t && window.matchMedia)
+      t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', t || 'dark');
+    if (q === 'light' || q === 'dark') { try { localStorage.setItem('vep_theme', q); } catch (e) {} }
+  })()</script>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNCIgZmlsbD0iIzBkMGQwZCIvPgogIDxsaW5lIHgxPSIyIiB5MT0iMTciIHgyPSIzMCIgeTI9IjE3IiBzdHJva2U9IiMyYTJhMmEiIHN0cm9rZS13aWR0aD0iMC44Ii8+CiAgPHBvbHlsaW5lCiAgICBwb2ludHM9IjIsMTcgNSwxNyA3LDIwIDksMTEgMTEsMjMgMTMsOCAxNS41LDE4IDE5LDE4IDIxLDIxIDI1LDE3IDMwLDE3IgogICAgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjY2NjIiBzdHJva2Utd2lkdGg9IjIiCiAgICBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+">
+  <title>VEPeagle — Log Analyzer</title>
+  <link rel="stylesheet" href="vep.css">
+</head>
+<body>
+
+<div id="overlay">
+<div id="overlayInner">
+<button id="themeToggleBtn" class="theme-toggle-btn" title="Switch light/dark theme" aria-label="Toggle light/dark theme">&#9728;</button>
+
+
+  <h2>VEP Log Analyzer</h2>
+  <div class="page-subtitle">Descriptive statistics &amp; APA-style report from a stimulus log file</div>
+
+  <!-- ══ FILE INPUT ══ -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-title">Log file</div>
+      <span class="section-meta">JSON output from any VEP stimulus</span>
+    </div>
+
+    <label class="drop-zone" id="dropZone" for="fileInput">
+      <div class="drop-zone-title">Drop a .json log here</div>
+      <div class="drop-zone-sub">or click to browse · processing happens locally in your browser</div>
+      <input id="fileInput" type="file" accept=".json,application/json">
+    </label>
+
+    <div id="fileInfo" style="margin-top:.7em; font-size:.85em; color:#7bc8e8; display:none;"></div>
+  </div>
+
+  <!-- ══ ERROR ══ -->
+  <div id="errorBox" class="error" style="display:none;"></div>
+
+  <!-- ══ RESULTS ══ -->
+  <div id="results" style="display:none;">
+
+    <!-- Session summary -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">Session</div>
+        <span class="section-meta" id="sessionMeta"></span>
+      </div>
+      <div class="summary-card" id="summaryCard"></div>
+    </div>
+
+    <!-- Descriptive table -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">Descriptive statistics</div>
+        <span class="section-meta">All durations in milliseconds unless noted</span>
+      </div>
+      <div id="statsBlock"></div>
+    </div>
+
+    <!-- APA paragraph -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">APA-style report</div>
+        <span class="section-meta">Click to copy</span>
+      </div>
+      <div class="apa-block copyable" id="apaBlock"></div>
+    </div>
+
+  </div>
+
+  <!-- ══ EMPTY ══ -->
+  <div id="emptyState" class="empty">
+    Load a JSON log to see descriptive statistics and an APA-style timing report.
+  </div>
+
+  <!-- Footer with help link -->
+  <div class="doc-footer">
+    <span>VEP Log Analyzer &nbsp;&mdash;&nbsp; v1.2.0</span>
+    <span><a href="manual.html#log" target="vep_manual">Help &amp; documentation</a></span>
+    <span>&copy; 2026 Jan Kremlacek &mdash; MIT License</span>
+  </div>
+
+</div>
+</div>
+
+
+<script>
+'use strict';
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Robust + parametric statistics
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** Robust median for an array of finite numbers. Returns NaN for empty input. */
+function median(arr) {
+  if (!arr.length) return NaN;
+  const s = [...arr].sort((a, b) => a - b);
+  const n = s.length;
+  return n % 2 ? s[(n - 1) >> 1] : 0.5 * (s[n / 2 - 1] + s[n / 2]);
+}
+
+/** Quartile via linear interpolation (R's "type-7" / Excel default). */
+function quantile(arr, p) {
+  if (!arr.length) return NaN;
+  const s = [...arr].sort((a, b) => a - b);
+  const idx = (s.length - 1) * p;
+  const lo  = Math.floor(idx), hi = Math.ceil(idx);
+  return lo === hi ? s[lo] : s[lo] + (idx - lo) * (s[hi] - s[lo]);
+}
+
+/** Median absolute deviation from the median, scaled to be SD-comparable
+ *  under the normal distribution (factor 1.4826). */
+function mad(arr) {
+  if (!arr.length) return NaN;
+  const m = median(arr);
+  const dev = arr.map(v => Math.abs(v - m));
+  return 1.4826 * median(dev);
+}
+
+function mean(arr) {
+  if (!arr.length) return NaN;
+  let s = 0;
+  for (const v of arr) s += v;
+  return s / arr.length;
+}
+
+function stdev(arr) {
+  if (arr.length < 2) return NaN;
+  const m = mean(arr);
+  let ss = 0;
+  for (const v of arr) ss += (v - m) ** 2;
+  return Math.sqrt(ss / (arr.length - 1));
+}
+
+/**
+ * Compute the full descriptive bundle for one numeric series.
+ * Returns null for empty inputs so callers can skip cleanly.
+ */
+function describe(values) {
+  const arr = values.filter(v => Number.isFinite(v));
+  if (!arr.length) return null;
+  const sorted = [...arr].sort((a, b) => a - b);
+  return {
+    n      : arr.length,
+    min    : sorted[0],
+    max    : sorted[sorted.length - 1],
+    median : median(arr),
+    q1     : quantile(arr, 0.25),
+    q3     : quantile(arr, 0.75),
+    iqr    : quantile(arr, 0.75) - quantile(arr, 0.25),
+    mad    : mad(arr),
+    mean   : mean(arr),
+    sd     : stdev(arr),
+  };
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Stimulus-type detection
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Identify the stimulus type. The log names it outright; the fallbacks read the
+ * shape of the event records, which is enough to place a log whose header is
+ * damaged or truncated.
+ * Returns one of 'flash', 'reversal', 'onset', 'motion', or null.
+ */
+function detectStimulus(log) {
+  const named = log && log.stimulus;
+  if (named && ['flash', 'reversal', 'onset', 'motion', 'oddball'].indexOf(named) >= 0) return named;
+  // Fallback: infer from event-record fields
+  const trials = log.trials || log.flashes || [];
+  if (!trials.length) return null;
+  const k = Object.keys(trials[0]);
+  if (k.includes('stimulus') && k.includes('role'))            return 'oddball';
+  if (k.includes('flash') && k.includes('flash_duration_ms')) return 'flash';
+  if (k.includes('half_period_ms'))                            return 'reversal';
+  if (k.includes('on_duration_ms'))                            return 'onset';
+  if (k.includes('move_duration_ms') || k.includes('direction')) return 'motion';
+  return null;
+}
+
+const PRETTY_TYPE = {
+  flash    : 'Flash VEP',
+  reversal : 'Pattern Reversal VEP',
+  onset    : 'Pattern Onset VEP',
+  motion   : 'Motion Onset VEP',
+  oddball  : 'Oddball VEP',
+};
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Per-stimulus metric computation
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Each metric is { label, unit, target, values, target_note? }
+ *   target — expected value for sanity comparison (may be null)
+ *   values — raw numeric series (used for describe())
+ */
+
+function metricsFlash(log) {
+  const tr = log.flashes || log.trials || [];
+  if (tr.length < 2) return [];
+
+  // Inter-flash intervals from real performance.now() timestamps
+  const interFlash = [];
+  for (let i = 1; i < tr.length; i++) {
+    const a = tr[i - 1].time_ms, b = tr[i].time_ms;
+    if (Number.isFinite(a) && Number.isFinite(b)) interFlash.push(b - a);
+  }
+
+  // Flash duration: prefer flash_duration_real_ms, the interval actually
+  // captured from the first flash frame's paint to the first blank frame's
+  // paint. flash_duration_ms is the theoretical flashFrames × 1000/measuredFPS
+  // and is only used when the measured value is missing.
+  const realDurField = tr.some(r => Number.isFinite(r.flash_duration_real_ms))
+    ? 'flash_duration_real_ms'
+    : 'flash_duration_ms';
+  const flashDur = tr.map(r => r[realDurField]).filter(Number.isFinite);
+  const realLabel = realDurField === 'flash_duration_real_ms'
+    ? 'Flash duration (real, first→next changed frame)'
+    : 'Flash duration (computed)';
+
+  const expected_period_ms = log.params && log.params.flashFreq
+    ? 1000 / log.params.flashFreq
+    : null;
+
+  return [
+    { group: 'Repetition', label: 'Inter-flash interval',
+      unit: 'ms', target: expected_period_ms,
+      target_label: expected_period_ms != null ? `1000 / flashFreq = ${expected_period_ms.toFixed(2)}` : null,
+      values: interFlash },
+    { group: 'Flash duration', label: realLabel,
+      unit: 'ms', target: null,
+      target_label: 'flashFrames / measuredFPS · 1000',
+      values: flashDur },
+  ];
+}
+
+function metricsReversal(log) {
+  const tr = log.trials || [];
+  if (tr.length < 2) return [];
+
+  const interRev = [];
+  for (let i = 1; i < tr.length; i++) {
+    const a = tr[i - 1].time_ms, b = tr[i].time_ms;
+    if (Number.isFinite(a) && Number.isFinite(b)) interRev.push(b - a);
+  }
+  const halfP = tr.map(r => r.half_period_ms);
+  const expected = halfP.length ? halfP[0] : null;
+
+  return [
+    { group: 'Reversal timing', label: 'Inter-reversal interval',
+      unit: 'ms', target: expected,
+      target_label: expected != null ? `half_period = ${expected.toFixed(2)}` : null,
+      values: interRev },
+  ];
+}
+
+function metricsOnset(log) {
+  const tr = log.trials || [];
+  if (!tr.length) return [];
+
+  const fps = log.params && log.params.measuredFPS;
+  const framePeriod_ms = (Number.isFinite(fps) && fps > 0) ? 1000 / fps : null;
+
+  // ON duration: prefer `on_duration_real_ms`, captured from the first ON
+  // frame's paint to the first OFF frame's paint; otherwise derive it from
+  // offset_ms − onset_ms. The explicit per-trial frame count
+  // (`on_duration_frames`) is used when present and inferred when not.
+  const onDur = [];
+  const onFrames = [];
+  for (const r of tr) {
+    let d = null, f = null;
+    if (Number.isFinite(r.on_duration_real_ms)) d = r.on_duration_real_ms;
+    else if (Number.isFinite(r.onset_ms) && Number.isFinite(r.offset_ms))
+      d = r.offset_ms - r.onset_ms;
+    if (Number.isFinite(r.on_duration_frames)) f = r.on_duration_frames;
+    else if (d != null && framePeriod_ms) f = Math.round(d / framePeriod_ms);
+    if (d != null) {
+      onDur.push(d);
+      onFrames.push(f);
+    }
+  }
+  // OFF duration: from offset_ms[i] to onset_ms[i+1]
+  const offDur = [];
+  for (let i = 1; i < tr.length; i++) {
+    const a = tr[i - 1].offset_ms, b = tr[i].onset_ms;
+    if (Number.isFinite(a) && Number.isFinite(b)) offDur.push(b - a);
+  }
+  // Trial period: onset[i+1] - onset[i]
+  const trialDur = [];
+  for (let i = 1; i < tr.length; i++) {
+    const a = tr[i - 1].onset_ms, b = tr[i].onset_ms;
+    if (Number.isFinite(a) && Number.isFinite(b)) trialDur.push(b - a);
+  }
+
+  // Targets: the per-trial values when the log carries them, otherwise the
+  // params block.
+  const firstTrial  = tr[0] || {};
+  const targetOn = Number.isFinite(firstTrial.on_duration_target_ms)
+    ? firstTrial.on_duration_target_ms
+    : (log.params && log.params.onDuration != null ? +log.params.onDuration : null);
+  const targetOff = Number.isFinite(firstTrial.off_duration_target_ms)
+    ? firstTrial.off_duration_target_ms
+    : (log.params && log.params.offDuration != null ? +log.params.offDuration : null);
+  const targetTrial = (targetOn != null && targetOff != null) ? targetOn + targetOff : null;
+
+  // Were the frame counts recorded per trial, or do they have to be inferred?
+  const framesExplicit = tr.some(r => Number.isFinite(r.on_duration_frames));
+
+  return [
+    { group: 'ON phase', label: 'ON duration (real)',
+      unit: 'ms', target: targetOn,
+      target_label: targetOn != null ? `onDuration = ${targetOn}` : null,
+      values: onDur,
+      frames: onFrames,
+      frameQuantised: framePeriod_ms !== null,
+      framesInferred: !framesExplicit },
+    { group: 'OFF phase', label: 'OFF duration (real)',
+      unit: 'ms', target: targetOff,
+      target_label: targetOff != null ? `offDuration = ${targetOff}` : null,
+      values: offDur },
+    { group: 'Trial timing', label: 'Trial duration (onset to onset)',
+      unit: 'ms', target: targetTrial,
+      target_label: targetTrial != null ? `onDuration + offDuration = ${targetTrial}` : null,
+      values: trialDur },
+  ];
+}
+
+function metricsMotion(log) {
+  const tr = log.trials || [];
+  if (!tr.length) return [];
+
+  // Collect MOVE durations paired with their frame counts so we can analyse
+  // frame quantisation downstream
+  const moveDur     = [];
+  const moveFrames  = [];     // paired 1:1 with moveDur
+  for (const r of tr) {
+    let d = null;
+    if (Number.isFinite(r.move_duration_ms)) d = r.move_duration_ms;
+    else if (Number.isFinite(r.onset_ms) && Number.isFinite(r.offset_ms)) d = r.offset_ms - r.onset_ms;
+    if (d !== null) {
+      moveDur.push(d);
+      moveFrames.push(Number.isFinite(r.frames) ? r.frames : null);
+    }
+  }
+  // HOLD duration: offset[i] to onset[i+1]
+  const holdDur = [];
+  for (let i = 1; i < tr.length; i++) {
+    const a = tr[i - 1].offset_ms, b = tr[i].onset_ms;
+    if (Number.isFinite(a) && Number.isFinite(b)) holdDur.push(b - a);
+  }
+  // Direction balance
+  const dirs = tr.map(r => r.direction).filter(d => d === 1 || d === -1);
+  const nExp = dirs.filter(d => d ===  1).length;
+  const nCon = dirs.filter(d => d === -1).length;
+
+  const targetMove = log.params && log.params.moveDuration != null ? +log.params.moveDuration : null;
+  const targetHold = log.params && log.params.holdDuration != null ? +log.params.holdDuration : null;
+
+  const out = [
+    { group: 'MOVE phase', label: 'MOVE duration (real)',
+      unit: 'ms', target: targetMove,
+      target_label: targetMove != null ? `moveDuration = ${targetMove}` : null,
+      values: moveDur,
+      frames: moveFrames,           // ← enables frame-quantisation panel
+      frameQuantised: true },
+    { group: 'HOLD phase', label: 'HOLD duration (real)',
+      unit: 'ms', target: targetHold,
+      target_label: targetHold != null ? `holdDuration = ${targetHold}` : null,
+      values: holdDur },
+  ];
+  // Tag direction balance for the APA paragraph (not a "metric" per se)
+  out._directionBalance = { expanding: nExp, contracting: nCon, total: dirs.length };
+  return out;
+}
+
+/**
+ * Oddball: ON duration per stimulus (each with its own frame breakdown), the
+ * off phase against its per-trial target (the jitter makes every trial's
+ * target different, so the error is what can be summarised), and the
+ * onset-to-onset interval. The sequence itself is checked separately.
+ */
+function metricsOddball(log) {
+  const tr = (log.trials || []).filter(r => Number.isFinite(r.stimulus));
+  if (!tr.length) return [];
+  const fps = log.params && log.params.measuredFPS;
+  const framePeriod_ms = (Number.isFinite(fps) && fps > 0) ? 1000 / fps : null;
+  const target = log.params && log.params.onDuration != null ? +log.params.onDuration : null;
+  const out = [];
+  const ids = [...new Set(tr.map(r => r.stimulus))].sort();
+  for (const i of ids) {
+    const rows = tr.filter(r => r.stimulus === i && Number.isFinite(r.on_duration_real_ms));
+    const role = rows.length ? rows[0].role : '';
+    out.push({ group: 'ON phase', label: `ON duration, stimulus ${i} (${role})`,
+      unit: 'ms', target: target,
+      target_label: target != null ? `onDuration = ${target}` : null,
+      values: rows.map(r => r.on_duration_real_ms),
+      frames: rows.map(r => Number.isFinite(r.on_duration_frames) ? r.on_duration_frames : null),
+      frameQuantised: framePeriod_ms !== null });
+  }
+  const offErr = [], offReal = [], soa = [];
+  for (let k = 1; k < tr.length; k++) {
+    const a = tr[k - 1], b = tr[k];
+    if (Number.isFinite(a.offset_ms) && Number.isFinite(b.onset_ms)) {
+      const d = b.onset_ms - a.offset_ms;
+      offReal.push(d);
+      if (Number.isFinite(a.off_duration_target_ms)) offErr.push(d - a.off_duration_target_ms);
+    }
+    if (Number.isFinite(a.onset_ms) && Number.isFinite(b.onset_ms)) soa.push(b.onset_ms - a.onset_ms);
+  }
+  const jit = log.params && log.params.offJitter;
+  out.push({ group: 'OFF phase', label: 'OFF duration (real)', unit: 'ms',
+    target: jit ? null : (log.params && log.params.offDuration != null ? +log.params.offDuration : null),
+    target_label: jit ? `offDuration + 0–${jit} ms jitter` : (log.params && log.params.offDuration != null ? `offDuration = ${log.params.offDuration}` : null),
+    values: offReal });
+  out.push({ group: 'OFF phase', label: 'OFF duration error (real − per-trial target)', unit: 'ms',
+    target: 0, target_label: 'per-trial target, jitter included', values: offErr });
+  out.push({ group: 'Trial timing', label: 'Onset-to-onset interval', unit: 'ms',
+    target: null, target_label: null, values: soa });
+  out._sequence = oddballSequenceCheck(log);
+  return out;
+}
+
+/** Compare the trials presented with the planned order and its constraints. */
+function oddballSequenceCheck(log) {
+  const seq = log.sequence || {};
+  const tr = (log.trials || []).filter(r => Number.isFinite(r.stimulus));
+  const shown = tr.map(r => r.stimulus).join('');
+  const counts = { 1: 0, 2: 0, 3: 0 };
+  tr.forEach(r => { counts[r.stimulus] = (counts[r.stimulus] || 0) + 1; });
+  let run = 0, maxRun = 0, since = 0, minBefore = Infinity, firstStd = 0, seenNon = false;
+  for (const c of shown) {
+    if (c === '1') { run++; since++; if (!seenNon) firstStd++; if (run > maxRun) maxRun = run; }
+    else { if (since < minBefore) minBefore = since; run = 0; since = 0; seenNon = true; }
+  }
+  const planned = seq.order || '';
+  return {
+    seed: seq.seed, planned_total: seq.total, planned_counts: seq.counts || null,
+    presented: tr.length, counts: counts,
+    complete: planned ? shown.length === planned.length : null,
+    matches_plan: planned ? planned.startsWith(shown) : null,
+    first_standards: firstStd, min_standards_before: isFinite(minBefore) ? minBefore : null,
+    max_standard_run: maxRun,
+    constraints: { first: seq.first_standards, min: seq.min_standards_before_nonstandard,
+                   maxRun: seq.max_standard_run },
+  };
+}
+
+function computeMetrics(stim, log) {
+  switch (stim) {
+    case 'flash'    : return metricsFlash(log);
+    case 'reversal' : return metricsReversal(log);
+    case 'onset'    : return metricsOnset(log);
+    case 'motion'   : return metricsMotion(log);
+    case 'oddball'  : return metricsOddball(log);
+    default         : return [];
+  }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Rendering — table
+   ══════════════════════════════════════════════════════════════════════════ */
+
+function fmtNum(x, dp = 1) {
+  return Number.isFinite(x) ? x.toFixed(dp) : '—';
+}
+
+/**
+ * Group an array of (value, frame) pairs by frame count.
+ * Returns sorted array of { frames, values, n }.
+ */
+function groupByFrames(values, frames) {
+  const groups = new Map();
+  for (let i = 0; i < values.length; i++) {
+    const f = frames[i];
+    if (!Number.isFinite(f)) continue;
+    if (!groups.has(f)) groups.set(f, []);
+    groups.get(f).push(values[i]);
+  }
+  return [...groups.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([frames, values]) => ({ frames, values, n: values.length }));
+}
+
+function buildTable(metrics, log) {
+  const fps = log.params && log.params.measuredFPS;
+  const framePeriod_ms = (Number.isFinite(fps) && fps > 0) ? 1000 / fps : null;
+
+  // Group metrics by .group
+  const groups = {};
+  for (const m of metrics) (groups[m.group] = groups[m.group] || []).push(m);
+
+  const html = [];
+  for (const [groupName, items] of Object.entries(groups)) {
+    html.push(`<div class="metric-group">`);
+    html.push(`<div class="metric-group-title">${escapeHTML(groupName)}</div>`);
+
+    // Standard one-line summary table per metric
+    html.push(`<div class="table-wrap"><table class="num">`);
+    html.push(`<thead><tr>
+      <th>Metric</th>
+      <th>n</th>
+      <th>Median</th>
+      <th>IQR (Q1–Q3)</th>
+      <th>MAD<sub>1.48</sub></th>
+      <th>Min – Max</th>
+      <th>Target</th>
+    </tr></thead><tbody>`);
+
+    for (const m of items) {
+      const d = describe(m.values);
+      if (!d) {
+        html.push(`<tr>
+          <td class="metric-name">${escapeHTML(m.label)}</td>
+          <td colspan="6" style="color:#7a8a98; text-align:center; font-style:italic;">no data</td>
+        </tr>`);
+        continue;
+      }
+      const dp     = m.unit === 'frames' ? 0 : 1;
+      const dpDev  = m.unit === 'frames' ? 1 : 1;
+      const iqrStr = `${fmtNum(d.q1, dp)} – ${fmtNum(d.q3, dp)}`;
+      const range  = `${fmtNum(d.min, dp)} – ${fmtNum(d.max, dp)}`;
+      const tgt    = m.target_label ? escapeHTML(m.target_label) : '—';
+      html.push(`<tr>
+        <td class="metric-name">${escapeHTML(m.label)}</td>
+        <td class="numeric">${d.n}</td>
+        <td class="numeric">${fmtNum(d.median, dp)}</td>
+        <td class="numeric">${iqrStr}</td>
+        <td class="numeric">${fmtNum(d.mad, dpDev)}</td>
+        <td class="numeric">${range}</td>
+        <td class="metric-target">${tgt}</td>
+      </tr>`);
+    }
+    html.push(`</tbody></table></div>`);
+
+    // Frame-quantisation breakdown for any metric that carries paired frames
+    for (const m of items) {
+      if (!m.frameQuantised || !m.frames) continue;
+      const grp = groupByFrames(m.values, m.frames);
+      if (grp.length === 0) continue;
+
+      const total = grp.reduce((s, g) => s + g.n, 0);
+      const inferredNote = m.framesInferred
+        ? ' <span class="t-faint" style="font-style:italic" >(frames inferred from duration ÷ frame period)</span>'
+        : '';
+
+      html.push(`<div class="frame-breakdown">`);
+      html.push(`<div class="frame-breakdown-title">
+        Frame-quantization breakdown — ${escapeHTML(m.label)}${inferredNote}
+      </div>`);
+
+      html.push(`<div class="table-wrap"><table class="num">`);
+      html.push(`<thead><tr>
+        <th>Frames</th>
+        <th>n</th>
+        <th>Share</th>
+        <th>Expected duration</th>
+        <th>Median (real)</th>
+        <th>IQR (real)</th>
+        <th>Min – Max</th>
+      </tr></thead><tbody>`);
+
+      for (const g of grp) {
+        const d = describe(g.values);
+        const expected = framePeriod_ms ? (g.frames * framePeriod_ms).toFixed(1) + ' ms' : '—';
+        const share = ((g.n / total) * 100).toFixed(1) + '%';
+        const iqr = `${fmtNum(d.q1, 1)} – ${fmtNum(d.q3, 1)} ms`;
+        const range = `${fmtNum(d.min, 1)} – ${fmtNum(d.max, 1)} ms`;
+        html.push(`<tr>
+          <td class="metric-name">${g.frames}</td>
+          <td class="numeric">${g.n}</td>
+          <td class="numeric">${share}</td>
+          <td class="metric-target">${expected}</td>
+          <td class="numeric">${fmtNum(d.median, 1)} ms</td>
+          <td class="numeric">${iqr}</td>
+          <td class="numeric">${range}</td>
+        </tr>`);
+      }
+      html.push(`</tbody></table></div>`);
+
+      // Realised frame period — sanity check
+      const perFramePairs = m.values
+        .map((v, i) => Number.isFinite(m.frames[i]) && m.frames[i] > 0 ? v / m.frames[i] : null)
+        .filter(v => Number.isFinite(v));
+      if (perFramePairs.length && framePeriod_ms !== null) {
+        const dPF = describe(perFramePairs);
+        html.push(`<div class="frame-breakdown-note">
+          Realized per-frame duration (logged ms ÷ frames): median <strong>${fmtNum(dPF.median, 2)}</strong> ms
+          · IQR ${fmtNum(dPF.q1, 2)}–${fmtNum(dPF.q3, 2)} ms
+          · expected from <code>1000 / measuredFPS</code> = <strong>${framePeriod_ms.toFixed(2)}</strong> ms.
+          ${dPF.median > framePeriod_ms * 1.05
+            ? '<br><span class="note-warn">Note: realized &gt; expected by &gt;5% — the logged duration includes a small latency between the offset condition and the next <code>performance.now()</code> read; treat this as a systematic offset, not jitter.</span>'
+            : ''}
+        </div>`);
+      }
+      html.push(`</div>`);  // .frame-breakdown
+    }
+
+    html.push(`</div>`);  // .metric-group
+  }
+  return html.join('');
+}
+
+function escapeHTML(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Rendering — APA-style paragraph
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Format a single APA-style sentence for one metric.
+ *  Median (IQR; MAD; range; n)  + optional target deviation
+ *  + optional frame-quantisation summary
+ */
+function apaSentence(label, m, d, opts) {
+  if (!d) return `${label}: no data.`;
+  opts = opts || {};
+  const framePeriod_ms = opts.framePeriod_ms;
+  const dp = m.unit === 'frames' ? 0 : 1;
+  const u  = m.unit;
+  let s = `${label}: Mdn = ${d.median.toFixed(dp)} ${u} `
+        + `(IQR = ${d.q1.toFixed(dp)}–${d.q3.toFixed(dp)} ${u}; `
+        + `MAD = ${d.mad.toFixed(dp)} ${u}; `
+        + `range ${d.min.toFixed(dp)}–${d.max.toFixed(dp)} ${u}; `
+        + `n = ${d.n})`;
+  if (m.target != null && Number.isFinite(m.target)) {
+    const dev = d.median - m.target;
+    const sign = dev >= 0 ? '+' : '−';
+    s += `; deviation from target (${m.target.toFixed(dp)} ${u}) = ${sign}${Math.abs(dev).toFixed(dp)} ${u}`;
+  }
+  s += '.';
+
+  // Frame-quantisation: report which frame counts dominate
+  if (m.frameQuantised && m.frames && framePeriod_ms) {
+    const groups = groupByFrames(m.values, m.frames);
+    if (groups.length >= 2) {
+      // Identify dominant pair
+      groups.sort((a, b) => b.n - a.n);
+      const top = groups.slice(0, 2);
+      const total = groups.reduce((sum, g) => sum + g.n, 0);
+      const parts = top.map(g => {
+        const exp_ms = (g.frames * framePeriod_ms).toFixed(1);
+        const pct    = ((g.n / total) * 100).toFixed(1);
+        return `${g.frames} frames (${exp_ms} ms expected, n = ${g.n}, ${pct}%)`;
+      });
+      s += ' Trials were quantized to ' + parts.join(' or ') + '.';
+    } else if (groups.length === 1) {
+      const g = groups[0];
+      const exp_ms = (g.frames * framePeriod_ms).toFixed(1);
+      s += ` All ${g.n} trials lasted exactly ${g.frames} frames (${exp_ms} ms expected).`;
+    }
+  }
+  return s;
+}
+
+/* All four stimuli keep the session's rendering details in params. */
+const RENDERER_LABEL = { webgl2: 'WebGL 2 (GPU)', canvas2d: 'Canvas 2D (CPU)' };
+
+/** Human-readable renderer, with the parity self-test result when present. */
+function rendererSummary(log) {
+  const p = log.params || {};
+  const r = p.renderer;
+  if (!r) return null;
+  let out = RENDERER_LABEL[r] || String(r);
+  const t = p.webgl_test;
+  if (t && typeof t === 'object') {
+    out += t.passed ? ' \u00B7 parity passed' : ' \u00B7 parity FAILED';
+    /* 60 draw calls in a tight loop with a GPU fence — a throughput figure,
+       unrelated to the display's refresh rate. Labelled so it cannot be read
+       as one. */
+    if (t.timing_60f_ms != null) out += ` \u00B7 60 draw calls in ${t.timing_60f_ms} ms (GPU throughput)`;
+  }
+  return out;
+}
+
+/** The gamma calibration block, or null when the log predates it. */
+function gammaBlock(log) {
+  const g = log.gamma;
+  return (g && typeof g === 'object') ? g : null;
+}
+
+/** Type of calibration in force, in the same words the stimulus pages use. */
+function gammaModelLabel(g) {
+  if (!g || !g.model) return '\u2014';
+  if (g.model === 'srgb_assumed') return 'None (sRGB assumed)';
+  return ({ srgb: 'sRGB', power: 'Power-law', measured: 'Measured' })[g.model] || g.model;
+}
+
+function buildAPA(stim, log, metrics) {
+  const params = log.params || {};
+  const cal    = log.calibration || {};
+  const measFps = params.measuredFPS || cal.measuredFPS || null;
+  const framePeriod_ms = (measFps && measFps > 0) ? 1000 / measFps : null;
+  const sessionStart = log.session_start_iso || '(session start time not recorded)';
+  const note = log.note ? ` Session note: "${log.note}".` : '';
+
+  const intro = [
+    `${PRETTY_TYPE[stim]} log analysis.`,
+    `Session recorded ${sessionStart} (suite ${log.suite_version || 'unknown'}`
+      + `${log.engine_version ? ', engine ' + log.engine_version : ''}).${note}`,
+    measFps
+      ? `Animation frames were delivered at ${measFps.toFixed(1)} Hz, a frame period of `
+        + `${framePeriod_ms.toFixed(2)} ms.`
+        + ((params.display_refresh_hz)
+            ? ` The presentation display was set to ${params.display_refresh_hz} Hz.`
+              + (Math.abs(measFps / params.display_refresh_hz - 1) > 0.05
+                  ? ' These differ: the browser paced the stimulus at a rate other than that of'
+                    + ' the display presenting it, so the effective temporal resolution was '
+                    + Math.min(measFps, params.display_refresh_hz).toFixed(1)
+                    + ' Hz, the slower of the two.'
+                  : '')
+            : '')
+      : null,
+    (function () {
+      const r = params.renderer;
+      if (!r) return null;
+      const path = (r === 'webgl2') ? 'a WebGL 2 shader on the GPU'
+                 : (r === 'canvas2d') ? 'Canvas 2D on the CPU' : String(r);
+      const t = params.webgl_test;
+      const parity = (t && typeof t === 'object')
+        ? (t.passed ? ' The GPU/CPU parity check passed for this configuration.'
+                    : ' The GPU/CPU parity check failed for this configuration.')
+        : '';
+      return `The stimulus was drawn with ${path}.${parity}`;
+    })(),
+    (function () {
+      const g = gammaBlock(log);
+      if (!g) return null;
+      if (g.model === 'srgb_assumed') {
+        return 'No display calibration was in force; sRGB was assumed, so luminances are relative and none is reported.';
+      }
+      let s = `Stimuli were rendered through a gamma-linearized pipeline (model: ${g.model}`;
+      if (g.L_max_cdm2 != null) s += `; L_max = ${g.L_max_cdm2} cd/m\u00B2`;
+      s += ').';
+      if (stim === 'oddball' && Array.isArray(log.stimuli)) {
+        const c = log.stimuli.filter(x => x.contrast_vs_background != null);
+        if (c.length) s += ' Michelson contrast in luminance against the background was '
+          + c.map(x => `${(x.contrast_vs_background * 100).toFixed(1)}% for stimulus ${x.stimulus}`).join(', ') + '.';
+        const Ls = log.stimuli.filter(x => x.L_cdm2 != null);
+        if (Ls.length && g.L_background_cdm2 != null) s += ' Luminances estimated from the display calibration were '
+          + Ls.map(x => `${x.L_cdm2} cd/m\u00B2 (stimulus ${x.stimulus})`).join(', ')
+          + ` and ${g.L_background_cdm2} cd/m\u00B2 for the background; these are estimates, not photometric measurements of this session.`;
+      } else if (g.michelson_contrast != null) {
+        s += ` Michelson contrast in luminance was ${(g.michelson_contrast * 100).toFixed(1)}%.`;
+      }
+      if (g.luminance_basis === 'measured_channels'
+       || g.luminance_basis === 'measured_grey_srgb_primaries') {
+        const hi = (g.L_flash_cdm2 != null) ? g.L_flash_cdm2 : g.L_light_cdm2;
+        const lo = (g.L_blank_cdm2 != null) ? g.L_blank_cdm2 : g.L_dark_cdm2;
+        if (hi != null && lo != null) {
+          s += ` Luminances estimated from the measured transfer function were ${hi} and ${lo} cd/m\u00B2`;
+          if (g.L_mean_cdm2 != null) s += ` (mean ${g.L_mean_cdm2} cd/m\u00B2)`;
+          s += '; these are estimates derived from the display calibration, not '
+             + 'photometric measurements of this session.';
+        }
+        s += (g.luminance_basis === 'measured_channels')
+           ? ' The relative luminance of the red, green and blue primaries was measured individually.'
+           : ' The relative luminance of the primaries was not measured; it was taken from the '
+             + 'BT.709/sRGB coefficients (0.2126, 0.7152, 0.0722), applied to linear light '
+             + '(Rec. ITU-R BT.709-6, 2015; IEC 61966-2-1:1999).';
+      }
+      if (g.dc_correction_cdm2) {
+        s += ` A luminance DC correction of ${g.dc_correction_cdm2 > 0 ? '+' : ''}`
+           + `${g.dc_correction_cdm2} cd/m\u00B2 was applied.`;
+      }
+      return s;
+    })(),
+  ].filter(Boolean).join(' ');
+
+  const stats = metrics.map(m =>
+    apaSentence(m.label, m, describe(m.values), { framePeriod_ms })
+  ).join(' ');
+
+  let extra = '';
+  if (stim === 'motion' && metrics._directionBalance) {
+    const b = metrics._directionBalance;
+    extra = ` Motion direction was randomized across ${b.total} trials `
+          + `(expanding n = ${b.expanding}, contracting n = ${b.contracting}).`;
+  }
+  if (stim === 'oddball' && metrics._sequence) {
+    const q = metrics._sequence;
+    const names = { 1: 'standard', 2: 'deviant', 3: 'third' };
+    extra = ` The session presented ${q.presented} of ${q.planned_total} planned trials (`
+      + Object.keys(q.counts).filter(k => q.counts[k] > 0).map(k => `${names[k]} n = ${q.counts[k]}`).join(', ')
+      + `), in the order generated from seed ${q.seed}`
+      + (q.matches_plan === false ? ', but the presented order DIFFERS from the planned one.' : '.')
+      + ` The sequence opened with ${q.first_standards} standards; at least `
+      + `${q.min_standards_before != null ? q.min_standards_before : '\u2014'} standards preceded every `
+      + `non-standard trial, and the longest run of standards was ${q.max_standard_run}.`;
+  }
+  if (stim === 'onset') {
+    const tr = log.trials || [];
+    const inv = tr.filter(r => r.phase_inverted === true).length;
+    if (inv > 0) {
+      extra = ` Anti-adaptation alternation produced ${inv} phase-inverted trials `
+            + `out of ${tr.length} total.`;
+    }
+  }
+
+  return intro + '\n\n' + stats + extra;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Rendering — session summary card
+   ══════════════════════════════════════════════════════════════════════════ */
+
+function buildSessionSummary(stim, log) {
+  const p   = log.params || {};
+  const cal = log.calibration || {};
+  const fps = p.measuredFPS || cal.measuredFPS || null;
+  /* A hand-edited or truncated log can carry something that is not a list
+     here; tr.length would then be undefined and the whole summary would throw
+     instead of reporting what it could read. The flashes fallback is for
+     1.0.0 logs. */
+  const trRaw = Array.isArray(log.trials) ? log.trials
+              : Array.isArray(log.flashes) ? log.flashes : null;
+  const tr  = trRaw || [];
+
+  const rows = [
+    ['Stimulus',          PRETTY_TYPE[stim] || 'Unknown'],
+    ['Suite version',     log.suite_version || '—'],
+    ['Engine version',    log.engine_version || '—'],
+    ['Session start',     log.session_start_iso || '—'],
+    ['Note',              log.note || '(none)'],
+    ['Events stimulated', tr.length.toString()],
+    ['Frame delivery rate', fps != null ? fps.toFixed(1) + ' Hz (measured)' : '—'],
+    ['Display refresh',    p.display_refresh_hz
+        ? p.display_refresh_hz + ' Hz (operator-entered)'
+          + ((fps && Math.abs(fps / p.display_refresh_hz - 1) > 0.05)
+              ? ' \u2014 does not match the delivered rate' : '')
+        : '(not recorded)'],
+  ];
+  /* Sync dot: size and the colour it fired in (black between triggers). Logs
+     written before 1.1.0 carry no colour; their dot was white. */
+  const sy = log.sync || {};
+  if (sy.dot_size != null || sy.colour) {
+    rows.push(['Sync dot', [
+      sy.dot_size != null ? sy.dot_size + ' px' : null,
+      sy.colour ? sy.colour : '#ffffff (not recorded; white before v1.1.0)',
+      sy.syncDotFrames != null ? sy.syncDotFrames + ' frames' : null,
+    ].filter(Boolean).join(' \u00B7 ')]);
+  }
+  // Stimulus-specific summary
+  if (stim === 'flash') {
+    rows.push(['Flash frequency',   p.flashFreq != null ? p.flashFreq + ' Hz' : '—']);
+    rows.push(['Flash duration',    p.flashFrames != null ? p.flashFrames + ' frames' : '—']);
+  } else if (stim === 'reversal') {
+    rows.push(['Reversal rate',     p.reversalsPerSec != null ? p.reversalsPerSec + ' rev/s' : '—']);
+    rows.push(['Pattern type',      p.patternType || '—']);
+  } else if (stim === 'onset') {
+    rows.push(['ON / OFF',          (p.onDuration ?? '—') + ' / ' + (p.offDuration ?? '—') + ' ms']);
+    rows.push(['Pattern type',      p.patternType || '—']);
+  } else if (stim === 'oddball') {
+    const st = Array.isArray(log.stimuli) ? log.stimuli : [];
+    st.forEach(x => rows.push([`Stimulus ${x.stimulus} (${x.role})`,
+      `${x.shape === 'svg' ? (x.svg_name || 'SVG') : x.shape} \u00B7 n = ${x.count} \u00B7 ${x.colour}`
+      + (x.height_deg != null ? ` \u00B7 ${x.width_deg}\u00B0 \u00D7 ${x.height_deg}\u00B0` : '')
+      + (x.contrast_vs_background != null ? ` \u00B7 C = ${(x.contrast_vs_background * 100).toFixed(1)}%` : '')
+      + ` \u00B7 sync ${x.sync_colour}`]));
+    rows.push(['ON / OFF', (p.onDuration ?? '\u2014') + ' / ' + (p.offDuration ?? '\u2014') + ' ms'
+      + (p.offJitter ? ' + 0\u2013' + p.offJitter + ' ms jitter' : '')]);
+    const sq = log.sequence || {};
+    rows.push(['Sequence', `seed ${sq.seed ?? '\u2014'} \u00B7 opening ${sq.first_standards ?? '\u2014'}`
+      + ` \u00B7 min ${sq.min_standards_before_nonstandard ?? '\u2014'} before non-standard`
+      + (sq.max_standard_run ? ` \u00B7 max run ${sq.max_standard_run}` : '')]);
+    const q = oddballSequenceCheck(log);
+    rows.push(['Sequence check', `${q.presented} / ${q.planned_total} trials`
+      + (q.matches_plan === false ? ' \u00B7 ORDER DIFFERS FROM PLAN' : ' \u00B7 order as planned')
+      + ` \u00B7 longest standard run ${q.max_standard_run}`]);
+  } else if (stim === 'motion') {
+    rows.push(['MOVE / HOLD',       (p.moveDuration ?? '—') + ' / ' + (p.holdDuration ?? '—') + ' ms']);
+    rows.push(['Temporal frequency', p.temporal_freq != null ? p.temporal_freq + ' Hz' : '—']);
+  }
+
+  /* Renderer: which path actually drew the stimulus. Absent in logs written
+     before the field existed, so say so rather than implying Canvas 2D. */
+  const rend = rendererSummary(log);
+  rows.push(['Renderer', rend || '(not recorded)']);
+  if (p.pause_count != null) rows.push(['Pauses', String(p.pause_count)]);
+
+  /* Gamma calibration and the photometry derived from it. */
+  const g = gammaBlock(log);
+  if (!g) {
+    rows.push(['Calibration', '(not recorded)']);
+  } else {
+    let calStr = gammaModelLabel(g);
+    if (g.L_max_cdm2 != null) calStr += ` \u00B7 L_max = ${g.L_max_cdm2} cd/m\u00B2`;
+    if (g.calibration_date) {
+      const d = new Date(g.calibration_date);
+      if (!isNaN(d)) {
+        try { calStr += ' \u00B7 ' + d.toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }); }
+        catch (e) { calStr += ' \u00B7 ' + d.toDateString(); }
+      }
+    }
+    rows.push(['Calibration', calStr]);
+    /* cal_source is the file name when one is known, otherwise 'url' or 'none'. */
+    if (g.cal_source) {
+      rows.push(['Calibration source',
+        (g.cal_source === 'url')  ? 'temporary (from link)' :
+        (g.cal_source === 'none') ? 'none' : g.cal_source]);
+    }
+    if (g.michelson_contrast != null && stim !== 'oddball') {
+      rows.push(['Michelson contrast', (g.michelson_contrast * 100).toFixed(1) + '%']);
+    }
+    if (stim === 'oddball' && g.L_background_cdm2 != null) {
+      rows.push(['Background luminance', g.L_background_cdm2 + ' cd/m\u00B2 (estimated)']);
+    }
+    /* Luminances are estimates from the transfer function, and only present
+       when the calibration was measured. Label them so a reader never mistakes
+       them for photometry performed during the session. */
+    const lumReported = (g.luminance_basis === 'measured_channels'
+                      || g.luminance_basis === 'measured_grey_srgb_primaries');
+    if (lumReported) {
+      rows.push(['Luminance basis', g.luminance_basis === 'measured_channels'
+        ? 'measured per channel'
+        : 'gray measured, R/G/B assumed from sRGB primaries']);
+      const pair = (g.L_flash_cdm2 != null)
+        ? ['Flash / blank luminance', `${g.L_flash_cdm2} / ${g.L_blank_cdm2} cd/m\u00B2 (estimated)`]
+        : (g.L_light_cdm2 != null)
+          ? ['Light / dark luminance', `${g.L_light_cdm2} / ${g.L_dark_cdm2} cd/m\u00B2 (estimated)`]
+          : null;
+      if (pair) rows.push(pair);
+      if (g.L_mean_cdm2 != null) rows.push(['Mean luminance', g.L_mean_cdm2 + ' cd/m\u00B2 (estimated)']);
+    }
+    if (g.dc_correction_cdm2) {
+      rows.push(['DC correction', g.dc_correction_cdm2 + ' cd/m\u00B2']);
+    }
+    const clipL = g.dc_clip_black_frac, clipH = g.dc_clip_white_frac;
+    if ((clipL != null && clipL > 0) || (clipH != null && clipH > 0)) {
+      rows.push(['DC saturation',
+        `${(100 * (clipL || 0)).toFixed(1)}% at black, ${(100 * (clipH || 0)).toFixed(1)}% at white`]);
+    }
+  }
+
+  let html = rows.map(([k, v]) =>
+    `<div class="k">${escapeHTML(k)}</div><div class="v">${escapeHTML(v)}</div>`
+  ).join('');
+
+  /* The replication link is the one value worth making clickable: it reopens the
+     stimulus with these settings and this calibration. Rendered separately so it
+     stays a link while every other value is escaped text. */
+  if (log.replication_url) {
+    html += `<div class="k">Replication link</div>`
+          + `<div class="v"><a href="${escapeHTML(log.replication_url)}" target="_blank"`
+          + ` style="color:#7bc8e8; word-break:break-all;">reopen this condition</a></div>`;
+  }
+  return html;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   File handling
+   ══════════════════════════════════════════════════════════════════════════ */
+
+function showError(msg) {
+  const el = document.getElementById('errorBox');
+  el.textContent = msg;
+  el.style.display = 'block';
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'none';
+}
+
+function clearError() {
+  document.getElementById('errorBox').style.display = 'none';
+}
+
+function processLog(log, filename) {
+  clearError();
+  const stim = detectStimulus(log);
+  if (!stim) {
+    showError('Could not identify the stimulus type. The file does not match any known VEP log format.');
+    return;
+  }
+  const metrics = computeMetrics(stim, log);
+  if (!metrics.length) {
+    showError(`Identified as ${PRETTY_TYPE[stim]}, but no usable timing events were found in the log.`);
+    return;
+  }
+
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('results').style.display = 'block';
+
+  document.getElementById('summaryCard').innerHTML = buildSessionSummary(stim, log);
+  document.getElementById('sessionMeta').textContent = filename || '';
+
+  document.getElementById('statsBlock').innerHTML = buildTable(metrics, log);
+  document.getElementById('apaBlock').textContent = buildAPA(stim, log, metrics);
+}
+
+function readLogFile(file) {
+  if (!file) return;
+  document.getElementById('fileInfo').style.display = 'block';
+  document.getElementById('fileInfo').textContent =
+    `Loaded: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    let log;
+    try { log = JSON.parse(e.target.result); }
+    catch (err) { showError('File is not valid JSON: ' + err.message); return; }
+    processLog(log, file.name);
+  };
+  reader.onerror = () => showError('Could not read file.');
+  reader.readAsText(file);
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Wiring
+   ══════════════════════════════════════════════════════════════════════════ */
+
+window.addEventListener('DOMContentLoaded', () => {
+
+  /* file input */
+  const fileInput = document.getElementById('fileInput');
+  const dropZone  = document.getElementById('dropZone');
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files && fileInput.files[0]) readLogFile(fileInput.files[0]);
+  });
+
+  /* drag-and-drop */
+  ['dragenter', 'dragover'].forEach(ev =>
+    dropZone.addEventListener(ev, e => {
+      e.preventDefault(); e.stopPropagation();
+      dropZone.classList.add('dragover');
+    })
+  );
+  ['dragleave', 'drop'].forEach(ev =>
+    dropZone.addEventListener(ev, e => {
+      e.preventDefault(); e.stopPropagation();
+      dropZone.classList.remove('dragover');
+    })
+  );
+  dropZone.addEventListener('drop', e => {
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0])
+      readLogFile(e.dataTransfer.files[0]);
+  });
+
+  /* APA copy-on-click */
+  document.getElementById('apaBlock').addEventListener('click', () => {
+    const el = document.getElementById('apaBlock');
+    const text = el.textContent;
+    if (!text) return;
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        el.classList.remove('apa-flash');
+        void el.offsetWidth;             // restart animation
+        el.classList.add('apa-flash');
+      })
+      .catch(() => {
+        // Clipboard blocked — fall back to manual selection
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      });
+  });
+});
+
+/* ── Light / dark theme toggle ── */
+(function () {
+  var KEY  = 'vep_theme';
+  var SUN  = '\u2600';  // ☀  shown in dark mode (click to go light)
+  var MOON = '\u25D7';  // ◗  shown in light mode (click to go dark)
+
+  function applyTheme(t) {
+    document.documentElement.setAttribute('data-theme', t || 'dark');
+    var btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.textContent = (t === 'light') ? MOON : SUN;
+  }
+
+  /* The bootstrap in <head> has already resolved the theme; follow it rather
+     than reading the store again, which would undo a theme passed in the URL. */
+  applyTheme(document.documentElement.getAttribute('data-theme') || 'dark');
+
+  document.addEventListener('DOMContentLoaded', function () {
+    applyTheme(document.documentElement.getAttribute('data-theme') || 'dark');
+    var btn = document.getElementById('themeToggleBtn');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+        try { localStorage.setItem(KEY, next); } catch (e) {}
+        applyTheme(next);
+      });
+    }
+
+    /* Hand the theme to the next page of the suite. The href is rewritten on
+       the way out, so links the page rebuilds at runtime are covered too. */
+    document.addEventListener('click', function (e) {
+      var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+      if (!a) return;
+      var href = a.getAttribute('href') || '';
+      if (!href || href.charAt(0) === '#') return;
+      var u;
+      try { u = new URL(a.href, location.href); } catch (err) { return; }
+      if (u.protocol !== location.protocol || !/\.html$/i.test(u.pathname)) return;
+      u.searchParams.set('theme', document.documentElement.getAttribute('data-theme') || 'dark');
+      a.href = u.toString();
+    }, true);
+  });
+})();
+
+</script>
+
+</body>
+</html>

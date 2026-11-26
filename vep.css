@@ -1,0 +1,2045 @@
+/* ── Palette ───────────────────────────────────────────────────────────────
+   Every colour the suite uses twice lives here once, as a role. The light
+   theme re-binds the same names; rules never spell a theme out.
+   Colours that must not follow the theme — the stimulus overlay, the colour
+   picker, the WebGL canvas, the gamma plot — keep their literals. */
+:root {
+  --tint-note:      rgba(123,200,232,.07);
+  --tint-warn:      rgba(232,165,90,.07);
+  --bg-page:        #444;
+  --bg-doc:         #16181e;
+  --bg-doc-soft:    #1d2128;
+  --bg-doc-card:    #232934;
+  --surface:        rgba(0,0,0,.3);
+  --surface-sunken: rgba(0,0,0,.4);
+  --tint-accent:    rgba(123,200,232,.18);
+  --border:         rgba(255,255,255,.15);
+  --border-strong:  rgba(255,255,255,.2);
+  --border-soft:    rgba(255,255,255,.07);
+  --border-accent:  rgba(123,200,232,.22);
+  --accent:         #7bc8e8;
+  --accent-2:       #29b;
+  --text:           #e0e0e0;
+  --text-strong:     #fff;
+  --text-soft:      #dde;
+  --text-mute:      #9ab;
+  --text-dim:       #6a8fa8;
+  --text-faint:     #6e8a98;
+  --warn:           #e8a55a;
+  --danger:         #ef6b6b;
+  --ok:             #59c08b;
+  --code-bg:        rgba(0,0,0,.35);
+}
+html[data-theme="light"] {
+  --tint-note:      rgba(0,70,110,.06);
+  --tint-warn:      rgba(140,80,10,.06);
+  --bg-page:        #dfe5ed;
+  --bg-doc:         #e8edf4;
+  --bg-doc-soft:    #dce3ed;
+  --bg-doc-card:    #f0f4f9;
+  --surface:        rgba(0,70,110,.05);
+  --surface-sunken: #fff;
+  --tint-accent:    rgba(18,100,120,.1);
+  --border:         rgba(0,70,110,.22);
+  --border-strong:  rgba(0,70,110,.28);
+  --border-soft:    rgba(0,70,110,.14);
+  --border-accent:  rgba(18,100,120,.2);
+  --accent:         #126478;
+  --accent-2:       #0a3f56;
+  --text:           #142029;
+  --text-strong:     #0d1520;
+  --text-soft:      #2a3848;
+  --text-mute:      #3a5060;
+  --text-dim:       #2a4860;
+  --text-faint:     #53707f;
+  --warn:           #8a5a10;
+  --danger:         #a52020;
+  --ok:             #1a6a46;
+  --code-bg:        rgba(0,70,110,.07);
+}
+
+/* VEPeagle shared stylesheet. One copy for the whole suite: design
+   tokens, page chrome, controls, tables and both themes. Rules that
+   belong to a single page stay in that page, after the link. */
+
+/* ---- first used by pattern_reversal_vep.html ---- */
+.section:last-of-type { margin-bottom: 0; }
+.section-title {
+      font-size: .92em;
+      font-weight: 700;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 0}
+.sub-title {
+      font-size: .7em;
+      font-weight: 600;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: rgba(123, 200, 232, .55);
+      margin: .9em 0 .45em;
+    }
+.sub-title:first-child { margin-top: 0; }
+.field-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .55em 1.4em;
+      align-items: start;
+    }
+.field-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.field-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.span-all { grid-column: 1 / -1; }
+label {
+      display: block;
+      font-size: .86em;
+      color: var(--text-mute);
+      margin-bottom: .12em}
+label.inline {
+      display: flex;
+      align-items: center;
+      gap: .45em;
+      color: var(--text-soft);
+      cursor: pointer;
+      font-size: .9em;
+      margin-bottom: 0}
+input[type=number], input[type=text]:not(.hex-input) {
+      width: 100%;
+      box-sizing: border-box;
+      padding: .32em .5em;
+      border-radius: .4em;
+      border: 1px solid var(--border);
+      background: var(--surface-sunken);
+      color: var(--text-strong);
+      font-size: .93em}
+input[type=number]:focus, input[type=text]:focus {
+      outline: none;
+      border-color: var(--accent)}
+input[type=checkbox] {
+      width: 14px; height: 14px;
+      accent-color: #29b;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+/* ── Pattern-type radio pill group ── */
+/* ── Pattern-type radio pill group ── */
+    .radio-pill-group {
+      display: flex;
+      gap: 0;
+      border-radius: .45em;
+      overflow: hidden;
+      border: 1px solid rgba(123, 200, 232, .25);
+      width: fit-content;
+    }
+.radio-pill-group input[type=radio] {
+      position: absolute;
+      opacity: 0;
+      width: 0; height: 0;
+      pointer-events: none;
+    }
+.radio-pill-group label {
+      display: flex;
+      align-items: center;
+      gap: .4em;
+      padding: .3em .9em;
+      font-size: .87em;
+      font-weight: 500;
+      color: var(--text-faint);
+      background: var(--surface);
+      cursor: pointer;
+      margin: 0;
+      transition: background .15s, color .15s;
+      border-right: 1px solid rgba(123, 200, 232, .15);
+      letter-spacing: .01em;
+      user-select: none}
+.radio-pill-group label:last-child { border-right: none; }
+.radio-pill-group label:hover { background: rgba(41,187,187,.12); color: #bde; }
+.radio-pill-group input[type=radio]:checked + label {
+      background: rgba(41,187,187,.22);
+      color: var(--accent);
+      font-weight: 600}
+.radio-pill-group label::before {
+      content: '';
+      display: inline-block;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      border: 1.5px solid currentColor;
+      opacity: .5;
+      flex-shrink: 0;
+    }
+.radio-pill-group input[type=radio]:checked + label::before {
+      background: var(--accent);
+      border-color: var(--accent);
+      opacity: 1}
+.swatch {
+      display: inline-block;
+      width: 18px; height: 18px;
+      border-radius: 3px;
+      border: 1px solid rgba(255,255,255,.3);
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: border-color .15s;
+    }
+.swatch:hover { border-color: #7bc8e8; }
+.hex-input {
+      width: 68px;
+      padding: .2em .35em;
+      border-radius: .35em;
+      border: 1px solid var(--border);
+      background: var(--surface-sunken);
+      color: #cde;
+      font-size: .8em;
+      font-family: monospace;
+      letter-spacing: .05em}
+.hex-input:focus { outline: none; border-color: var(--accent)}
+.hex-input.invalid { border-color: #e55; }
+.colour-pair {
+      display: flex;
+      align-items: center;
+      gap: .35em;
+      font-size: .8em;
+      color: var(--text-mute)}
+.inset-divider {
+      border: none;
+      border-top: 1px solid var(--border-soft);
+      margin: .9em 0}
+#noteField {
+      width: 100%;
+      box-sizing: border-box;
+      padding: .32em .5em;
+      border-radius: .4em;
+      border: 1px solid var(--border);
+      background: var(--surface-sunken);
+      color: var(--text-strong);
+      font-size: .93em}
+button {
+      padding: .55em 2em;
+      font-size: 1em;
+      border-radius: 2em;
+      border: 0;
+      background: #17799a;
+      color: #fff;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+button:hover { background: #136a88; }
+button.secondary {
+      background: rgba(255,255,255,.12);
+      font-size: .88em;
+      padding: .45em 1.4em;
+    }
+button.secondary:hover { background: var(--border-strong)}
+button:disabled, button:disabled:hover { opacity: .38; cursor: not-allowed; background: #17799a; }
+button.secondary:disabled, button.secondary:disabled:hover { background: rgba(255,255,255,.12); }
+/* Muted text and warnings need light-theme values too. */
+html[data-theme="light"] .run-status.warn { color: #8a5a10; }
+/* A disabled control in light mode needs its own fill and text colour: the dark
+   theme leans on white at low opacity, which disappears on a light page. */
+html[data-theme="light"] button:disabled,
+html[data-theme="light"] button:disabled:hover {
+  opacity: 1;
+  background: rgba(0,60,90,.07);
+  color: #5a6b78;
+  border-color: rgba(0,80,120,.22);
+}
+html[data-theme="light"] button.secondary:disabled,
+html[data-theme="light"] button.secondary:disabled:hover {
+  background: rgba(0,60,90,.07);
+}
+
+/* ── Run controls (Start / Pause / Stop + status), shown under the title ── */
+/* ── Run controls (Start / Pause / Stop + status), shown under the title ── */
+    .run-panel {
+      display: flex; flex-direction: column; gap: .55em;
+      margin: 0 0 2.2em; padding: .9em 1em;
+      border: 1px solid var(--border-accent); border-radius: .5em;
+      background: rgba(41,150,187,.06)}
+.run-buttons { display: flex; gap: .6em; align-items: center; flex-wrap: wrap; }
+.run-buttons .spacer { flex: 1; }
+.run-status {
+      font-size: .82em; color: var(--text-soft); line-height: 1.5;
+      min-height: 1.3em;
+    }
+.run-status.warn { color: var(--warn)}
+.log-row {
+      display: flex; align-items: center; gap: .8em; flex-wrap: wrap;
+      margin-top: .2em; padding-top: .55em;
+      border-top: 1px solid rgba(255,255,255,.08);
+    }
+.log-row #noteField {
+      flex: 1; min-width: 180px; box-sizing: border-box;
+      padding: .32em .5em; border-radius: .4em;
+      border: 1px solid var(--border);
+      background: var(--surface-sunken); color: var(--text-strong); font-size: .9em}
+.hint {
+      font-size: .78em;
+      color: var(--text-faint);
+      margin-top: 1em;
+      line-height: 1.55}
+/* Pattern-type-conditional rows */
+/* Pattern-type-conditional rows */
+    .radial-only, .checker-only { transition: opacity .2s; }
+.radial-only.hidden, .checker-only.hidden {
+      opacity: .25;
+      pointer-events: none;
+    }
+.theme-toggle-btn {
+  position: absolute; top: 1.1em; right: .2em;
+  width: 2em; height: 2em; border-radius: 50%;
+  padding: 0; box-sizing: border-box;
+  border: 1px solid rgba(123,200,232,.28);
+  background: rgba(0,0,0,.22); color: var(--accent);
+  cursor: pointer; font-size: 1.05em; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .18s, border-color .18s;
+  z-index: 20; flex-shrink: 0}
+.theme-toggle-btn:hover {
+  background: var(--tint-accent); border-color: var(--accent)}
+html[data-theme="light"] #overlay {
+  background: rgba(238,243,250,.98);
+  color: #0d1520;
+}
+html[data-theme="light"] h2 { color: #0a1422; }
+html[data-theme="light"] .section-head {
+  border-bottom-color: rgba(0,80,120,.18);
+}
+html[data-theme="light"] input:focus {
+  border-color: #126478;
+}
+html[data-theme="light"] input[type=radio],
+html[data-theme="light"] input[type=checkbox] { accent-color: #126478; }
+html[data-theme="light"] button.primary {
+  background: rgba(18,100,120,.14);
+  color: #0a4c60;
+}
+html[data-theme="light"] button.primary:hover {
+  background: rgba(18,100,120,.26);
+  color: #052535;
+}
+
+/* Secondary controls had no light-theme rule, so they kept white text on a
+   near-white fill. Follow the .primary pattern. */
+html[data-theme="light"] button.secondary {
+  background: rgba(18,100,120,.10);
+  color: #0a4c60;
+}
+html[data-theme="light"] button.secondary:hover {
+  background: rgba(18,100,120,.20);
+  color: #052535;
+}
+html[data-theme="light"] #fpsDisplay,
+html[data-theme="light"] #calibrationStatus,
+html[data-theme="light"] #gateCalStatus {
+  background: rgba(0,70,110,.05);
+  border-color: rgba(0,70,110,.18);
+  color: #126478;
+}
+/* Colour swatches / hex inputs */
+/* Colour swatches / hex inputs */
+html[data-theme="light"] .colour-pair   { color: #3a5060; }
+html[data-theme="light"] .hex-input {
+  border-color: rgba(0,70,110,.2);
+  color: #0d1520}
+/* Radio pills */
+/* Radio pills */
+html[data-theme="light"] .radio-pill-group {
+  border-color: rgba(18,100,120,.28);
+}
+html[data-theme="light"] .radio-pill-group label {
+  border-right-color: rgba(18,100,120,.14)}
+html[data-theme="light"] .radio-pill-group label:hover {
+  background: rgba(18,100,120,.09);
+  color: #123a50;
+}
+html[data-theme="light"] .radio-pill-group input[type=radio]:checked + label {
+  background: rgba(18,100,120,.18)}
+html[data-theme="light"] table td {
+  color: #1a2a38;
+  border-color: rgba(0,70,110,.1);
+}
+html[data-theme="light"] table tr:nth-child(even) td {
+  background: rgba(0,70,110,.04);
+}
+html[data-theme="light"] #saveMsg { color: #1a5a38; }
+/* Patch / verification overlays stay dark (they need accurate color rendition) */
+
+/* ── Toggle button in light mode ── */
+/* Patch / verification overlays stay dark (they need accurate color rendition) */
+
+/* ── Toggle button in light mode ── */
+html[data-theme="light"] .theme-toggle-btn {
+  background: rgba(255,255,255,.7);
+  border-color: rgba(18,100,120,.28);
+  color: #126478;
+}
+html[data-theme="light"] .radio-pill-group label{ color: #2c4a58; }
+/* ── Inline dark-mode colours that CSS-class rules cannot override ─────────
+   Using attribute-value substring selectors + !important to overrule them.
+   Covers both static HTML inline styles and JS-generated innerHTML.        */
+/* ── Inline dark-mode colours that CSS-class rules cannot override ─────────
+   Using attribute-value substring selectors + !important to overrule them.
+   Covers both static HTML inline styles and JS-generated innerHTML.        */
+
+html[data-theme="light"] .sub-title { color: #0d5472; }
+/* near-white/near-invisible on light bg */
+/* near-white/near-invisible on light bg */
+html[data-theme="light"] [style*="color:#dde"],
+html[data-theme="light"] [style*="color: #dde"]       { color: #0d1520 !important; }
+html[data-theme="light"] [style*="color:#ffffff"],
+html[data-theme="light"] [style*="color: #ffffff"]     { color: #0d1520 !important; }
+/* teal accent (#7bc8e8, #7bc) — 1.65:1 on light bg */
+/* teal accent (#7bc8e8, #7bc) — 1.65:1 on light bg */
+html[data-theme="light"] [style*="color:#7bc8e8"],
+html[data-theme="light"] [style*="color: #7bc8e8"]     { color: #0d5472 !important; }
+html[data-theme="light"] [style*="color:#7bc;"],
+html[data-theme="light"] [style*="color: #7bc;"]       { color: #0d5472 !important; }
+/* medium blue-grey (#5a7a8a) — 4.11:1 on light bg */
+/* medium blue-grey (#5a7a8a) — 4.11:1 on light bg */
+html[data-theme="light"] [style*="color:#5a7a8a"],
+html[data-theme="light"] [style*="color: #5a7a8a"]     { color: #2c4a58 !important; }
+/* amber warning (#e8a55a) — looks washed out on light bg */
+/* amber warning (#e8a55a) — looks washed out on light bg */
+html[data-theme="light"] [style*="color:#e8a55a"],
+html[data-theme="light"] [style*="color: #e8a55a"]     { color: #7a4200 !important; }
+/* green success (#59c08b) */
+/* green success (#59c08b) */
+html[data-theme="light"] [style*="color:#59c08b"],
+html[data-theme="light"] [style*="color: #59c08b"]     { color: #186040 !important; }
+/* APA preview (#bc9 abbreviated green) */
+/* APA preview (#bc9 abbreviated green) */
+html[data-theme="light"] [style*="color:#bc9;"],
+html[data-theme="light"] [style*="color: #bc9;"]       { color: #285020 !important; }
+html.vep-child #overlay { display: none !important; }
+
+/* ---- first used by oddball_vep.html ---- */
+/* ── Display Calibration ── */
+/* ── Display Calibration ── */
+html[data-theme="light"] table.meas th {
+  color: #126478;
+  border-bottom-color: rgba(18,100,120,.2);
+}
+html[data-theme="light"] table.meas td {
+  border-bottom-color: rgba(0,70,110,.09);
+}
+
+/* ---- first used by vep_gate.html ---- */
+html[data-theme="light"] button.danger {
+  background: rgba(150,40,40,.12);
+  color: #7a2020;
+}
+html[data-theme="light"] button.danger:hover {
+  background: rgba(150,40,40,.24);
+  color: #5a1010;
+}
+
+/* ---- first used by display_calibration.html ---- */
+.doc-footer a { color: var(--accent); text-decoration: none}
+html[data-theme="light"] .doc-footer       { color: #7a9aaa; }
+html[data-theme="light"] .doc-footer a     { color: #126478; }
+/* ── Light theme contrast corrections (WCAG AA pass for all text) ────────
+   doc-footer #7a9aaa  → #3d5869  (2.68 → 6.73 : 1)
+   hint/note  #5a7a8a  → #2c4a58  (4.11 → 8.46 : 1)
+   ─────────────────────────────────────────────────────────────────────── */
+/* ── Light theme contrast corrections (WCAG AA pass for all text) ────────
+   doc-footer #7a9aaa  → #3d5869  (2.68 → 6.73 : 1)
+   hint/note  #5a7a8a  → #2c4a58  (4.11 → 8.46 : 1)
+   ─────────────────────────────────────────────────────────────────────── */
+html[data-theme="light"] .doc-footer           { color: #3d5869; }
+/* manual-specific */
+/* manual-specific */
+html[data-theme="light"] .doc-footer a         { color: #0d5472; }
+
+/* Text colours that used to sit in style="" attributes, where no theme rule
+   could reach them. The dark values are the literals they replace. */
+.t-amber { color: #f4d35e; }
+.t-dim   { color: var(--text-mute)}
+.t-dim-2 { color: #8ab; }
+.t-mute  { color: var(--text-faint)}
+.t-grey  { color: var(--text-mute)}
+.t-slate { color: var(--text-dim)}
+html[data-theme="light"] .t-amber { color: #8a6a10; }
+html[data-theme="light"] .t-dim,
+html[data-theme="light"] .t-dim-2,
+html[data-theme="light"] .t-mute,
+html[data-theme="light"] .t-slate { color: #46606f; }
+html[data-theme="light"] .t-grey  { color: #50606a; }
+
+/* Dark-only rules recoloured above also paint the light theme. */
+html[data-theme="light"] .hint { color: #53707f; }
+
+/* Mutes that were below 4.5:1 on their own card, one value per theme. */
+.t-faint { color: var(--text-faint)}
+.t-steel { color: var(--text-faint)}
+html[data-theme="light"] .t-faint { color: #53707f; }
+html[data-theme="light"] .section-meta { color: #537083; }
+
+/* ── Copyable blocks ───────────────────────────────────────────────────────
+   The reproducible link and the APA-style report, same frame everywhere. A
+   click copies the text; VEP.copyToClipboard flashes the block green. */
+.apa-block, .url-block {
+  display: block;
+  margin: 0;
+  padding: .8em 1em;
+  background: var(--code-bg);
+  border-left: 3px solid var(--border-accent);
+  border-radius: .35em;
+  line-height: 1.6;
+}
+.apa-block.copyable, .url-block.copyable { cursor: pointer; transition: color .18s; }
+.url-block {
+  font-family: 'SF Mono', Consolas, monospace;
+  font-size: .88em;
+  color: var(--accent);
+  word-break: break-all;
+}
+.url-block.copyable:hover { color: var(--text); }
+.apa-block {
+  font-family: serif;
+  font-size: .95em;
+  color: #d8d2c0;
+  border-left-color: #bc9;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.apa-block.copyable:hover { color: #f0e8c8; }
+.apa-flash { animation: apaFlash 1s ease-out; }
+@keyframes apaFlash { 0% { color: #8f8; } 100% { color: #d8d2c0; } }
+html[data-theme="light"] .apa-block { color: #1d2a33; }
+html[data-theme="light"] .apa-block.copyable:hover { color: #0a1422; }
+
+/* ── Callouts ──────────────────────────────────────────────────────────────
+   Two kinds. A note explains, a warning says what can go wrong. */
+.note, .warn {
+  margin: .9em 0;
+  padding: .65em .9em;
+  border-radius: .4em;
+  border-left: 3px solid var(--accent);
+  background: var(--tint-note);
+  font-size: .92em;
+}
+.note strong, .warn strong { color: var(--text); letter-spacing: .03em; }
+.warn { border-left-color: var(--warn); background: var(--tint-warn); }
+.warn strong { color: var(--warn); }
+
+/* ── Tables ────────────────────────────────────────────────────────────────
+   One base; `.num` right-aligns columns of numbers and keeps the first column
+   left, `.kv` is for the key-and-value tables that carry no header row. */
+table { width: 100%; border-collapse: collapse; margin: .8em 0 1.2em; font-size: .9em; }
+th, td {
+  text-align: left;
+  padding: .42em .65em;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border-soft);
+}
+th {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: .85em;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border-accent);
+}
+td code { font-size: .88em; }
+table.num th, table.num td { text-align: right; font-variant-numeric: tabular-nums; }
+table.num th:first-child, table.num td:first-child { text-align: left; }
+table.kv td:first-child { color: var(--text-mute); width: 32%; }
+html[data-theme="light"] table th { background: rgba(0,70,110,.05); }
+
+/* ── Collapsible asides ────────────────────────────────────────────────────
+   Same marker as the gate's collapsible sections. */
+details { margin: .8em 0; padding: .6em .9em; background: var(--surface);
+          border: 1px solid var(--border-soft); border-radius: .4em; }
+details > summary { cursor: pointer; list-style: none; color: var(--accent);
+                    font-size: .9em; font-weight: 600; letter-spacing: .02em; }
+details > summary::-webkit-details-marker { display: none; }
+details > summary::before { content: '\25B8\00a0'; font-size: .9em; }
+details[open] > summary::before { content: '\25BE\00a0'; }
+details > summary:hover { color: var(--text); }
+details > *:not(summary) { margin-top: .8em; }
+/* the gate's collapsible section headings are headings, not asides */
+details.setup { padding: 0; background: none; border: 0; }
+
+/* ── Sections ──────────────────────────────────────────────────────────────
+   The top margin shows only where a section follows something that is not a
+   section; between two sections the margins collapse to 2em. */
+.section { margin: 1.7em 0 2em; }
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: .65em;
+  padding-bottom: .45em;
+  border-bottom: 1px solid var(--border-accent);
+}
+.section-meta { font-size: .78em; color: var(--text-dim); letter-spacing: .03em; }
+
+/* ── The autostart card ────────────────────────────────────────────────────
+   Part of the presentation rather than of the page: it paints its own dark
+   surface over everything, so theme rules must not reach inside it. */
+#autostartScreen .autostart-table td {
+  border-bottom-color: rgba(255,255,255,.07);
+  background: transparent;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Page sections. Each page's own rules, scoped by the class on its <html>
+   element. :where() adds no specificity and these sections come after
+   everything above, so each rule behaves exactly as it did in the page.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Flash VEP (flash_vep.html) — scope .page-flash ─────────────────────────── */
+html:where(.page-flash), :where(.page-flash) body{ margin: 0; padding: 0; overflow: hidden; background: var(--bg-page)}
+:where(.page-flash) #overlay{
+      position: absolute; inset: 0;
+      display: flex; align-items: flex-start; justify-content: center;
+      overflow-y: auto;
+      background: rgba(22, 24, 30, .97);
+      color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      font-size: 14px; line-height: 1.5;
+    }
+:where(.page-flash) #overlayInner{
+      width: 100%; max-width: min(92vw, 800px);
+      padding: 2.4em 2em 1.8em;
+      box-sizing: border-box;
+    }
+:where(.page-flash) h2{ margin: 0 0 .2em; font-size: 1.5em; font-weight: 700; letter-spacing: .02em; color: #fff; }
+:where(.page-flash) .page-subtitle{ font-size: .82em; color: var(--text-dim); margin: 0 0 2.2em; letter-spacing: .04em}
+:where(.page-flash) .duration-note{
+      font-size: .76em; color: var(--accent); margin-top: .25em;
+      font-family: monospace; letter-spacing: .03em;
+      min-height: 1.2em}
+/* ── Colour picker popup ── */
+/* ── Colour picker popup ── */
+    :where(.page-flash) #colorPicker{
+      display: none; position: fixed; z-index: 999;
+      background: #1e2a38; border: 1px solid rgba(255,255,255,.2);
+      border-radius: .6em; padding: .7em;
+      box-shadow: 0 4px 24px rgba(0,0,0,.6); user-select: none;
+    }
+:where(.page-flash) #colorPicker canvas{ display: block; border-radius: 50%; cursor: crosshair; }
+:where(.page-flash) #pickerSlider{ width: 160px; margin-top: .5em; accent-color: #29b; }
+:where(.page-flash) #pickerPreview{ width: 160px; height: 20px; border-radius: 3px; margin-top: .4em; border: 1px solid rgba(255,255,255,.2); }
+:where(.page-flash) #pickerClose{ display: block; margin-top: .5em; width: 100%; padding: .3em; font-size: .9em; border-radius: .4em; border: 0; background: #29b; color: #fff; cursor: pointer; }
+/* ═══════════════════════════════════════════════════════════════════════════
+   VEPeagle — Light / dark theme system
+   Activate light mode by setting  data-theme="light"  on <html>.
+   Dark mode is the default (no attribute needed).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Toggle button ── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   VEPeagle — Light / dark theme system
+   Activate light mode by setting  data-theme="light"  on <html>.
+   Dark mode is the default (no attribute needed).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Toggle button ── */
+:where(.page-flash) #overlayInner{ position: relative; }
+/* ── Light theme overrides ─────────────────────────────────────────────── */
+/* ── Light theme overrides ─────────────────────────────────────────────── */
+html:where(.page-flash)[data-theme="light"] body{ background: #dfe5ed; }
+html:where(.page-flash)[data-theme="light"] .page-subtitle{ color: #4a6a80; }
+html:where(.page-flash)[data-theme="light"] #calFileMsg{ color: #2c4a58; }
+/* Inline notes */
+/* Inline notes */
+html:where(.page-flash)[data-theme="light"] .duration-note{ color: #53707f; }
+/* ── Log Analyzer ── */
+/* ── Log Analyzer ── */
+html:where(.page-flash)[data-theme="light"] #dropZone{
+  background: rgba(0,70,110,.04);
+  border-color: rgba(0,70,110,.22);
+  color: #4a6a80;
+}
+html:where(.page-flash)[data-theme="light"] #contrastPreview{ color: #126478; }
+html:where(.page-flash)[data-theme="light"] .duration-note{ color: #2c4a58; }
+html:where(.page-flash)[data-theme="light"] #calFileMsg{ color: #2c4a58; }
+html:where(.page-flash)[data-theme="light"] #dropZone{ color: #2a4860; }
+html:where(.page-flash)[data-theme="light"] #contrastPreview{ color: #0f5470; }
+html:where(.page-flash)[data-theme="light"] .note{ color: #1a3848; }
+/* ═══ WebGL overlay, pause, child-panel ══════════════════════════════════ */
+/* ═══ WebGL overlay, pause, child-panel ══════════════════════════════════ */
+:where(.page-flash) #glCanvas{ position:fixed; top:0; left:0; display:none; pointer-events:none; z-index:5; }
+
+/* ── Pattern-reversal VEP (pattern_reversal_vep.html) — scope .page-reversal ──── */
+html:where(.page-reversal), :where(.page-reversal) body{
+      margin: 0; padding: 0;
+      overflow: hidden;
+      background: var(--bg-page)}
+:where(.page-reversal) #overlay{
+      position: absolute; inset: 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      overflow-y: auto;
+      background: rgba(22, 24, 30, .97);
+      color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+:where(.page-reversal) #overlayInner{
+      width: 100%;
+      max-width: min(92vw, 800px);
+      padding: 2.4em 2em 1.8em;
+      box-sizing: border-box;
+    }
+:where(.page-reversal) h2{
+      margin: 0 0 .2em;
+      font-size: 1.5em;
+      font-weight: 700;
+      letter-spacing: .02em;
+      color: #fff;
+    }
+:where(.page-reversal) .page-subtitle{
+      font-size: .82em;
+      color: var(--text-dim);
+      margin: 0 0 2.2em;
+      letter-spacing: .04em}
+/* ── Picker popup ── */
+/* ── Picker popup ── */
+    :where(.page-reversal) #colorPicker{
+      display: none;
+      position: fixed;
+      z-index: 999;
+      background: #1e2a38;
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: .6em;
+      padding: .7em;
+      box-shadow: 0 4px 24px rgba(0,0,0,.6);
+      user-select: none;
+    }
+:where(.page-reversal) #colorPicker canvas{ display: block; border-radius: 50%; cursor: crosshair; }
+:where(.page-reversal) #pickerSlider{
+      width: 160px; margin-top: .5em;
+      accent-color: #29b;
+    }
+:where(.page-reversal) #pickerPreview{
+      width: 160px; height: 20px;
+      border-radius: 3px;
+      margin-top: .4em;
+      border: 1px solid rgba(255,255,255,.2);
+    }
+:where(.page-reversal) #pickerClose{
+      display: block; margin-top: .5em; width: 100%;
+      padding: .3em; font-size: .9em;
+      border-radius: .4em; border: 0;
+      background: #29b; color: #fff; cursor: pointer;
+    }
+/* ═══════════════════════════════════════════════════════════════════════════
+   VEPeagle — Light / dark theme system
+   Activate light mode by setting  data-theme="light"  on <html>.
+   Dark mode is the default (no attribute needed).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Toggle button ── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   VEPeagle — Light / dark theme system
+   Activate light mode by setting  data-theme="light"  on <html>.
+   Dark mode is the default (no attribute needed).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Toggle button ── */
+:where(.page-reversal) #overlayInner{ position: relative; }
+/* ── Light theme overrides ─────────────────────────────────────────────── */
+/* ── Light theme overrides ─────────────────────────────────────────────── */
+html:where(.page-reversal)[data-theme="light"] body{ background: #dfe5ed; }
+html:where(.page-reversal)[data-theme="light"] .page-subtitle{ color: #4a6a80; }
+/* ── Log Analyzer ── */
+/* ── Log Analyzer ── */
+html:where(.page-reversal)[data-theme="light"] #dropZone{
+  background: rgba(0,70,110,.04);
+  border-color: rgba(0,70,110,.22);
+  color: #4a6a80;
+}
+html:where(.page-reversal)[data-theme="light"] #contrastPreview{ color: #126478; }
+html:where(.page-reversal)[data-theme="light"] #calFileMsg{ color: #2c4a58; }
+html:where(.page-reversal)[data-theme="light"] #dropZone{ color: #2a4860; }
+html:where(.page-reversal)[data-theme="light"] #contrastPreview{ color: #0f5470; }
+html:where(.page-reversal)[data-theme="light"] .note{ color: #1a3848; }
+/* ═══ WebGL overlay, pause, child-panel ══════════════════════════════════ */
+/* ═══ WebGL overlay, pause, child-panel ══════════════════════════════════ */
+:where(.page-reversal) #glCanvas{ position:fixed; top:0; left:0; width:100vw; height:100vh; display:none; pointer-events:none; z-index:5; }
+
+/* ── Pattern-onset VEP (pattern_onset_vep.html) — scope .page-onset ─────────── */
+html:where(.page-onset), :where(.page-onset) body{
+      margin: 0; padding: 0;
+      overflow: hidden;
+      background: var(--bg-page)}
+:where(.page-onset) #overlay{
+      position: absolute; inset: 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      overflow-y: auto;
+      background: rgba(22, 24, 30, .97);
+      color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+:where(.page-onset) #overlayInner{
+      width: 100%;
+      max-width: min(92vw, 800px);
+      padding: 2.4em 2em 1.8em;
+      box-sizing: border-box;
+    }
+:where(.page-onset) h2{
+      margin: 0 0 .2em;
+      font-size: 1.5em;
+      font-weight: 700;
+      letter-spacing: .02em;
+      color: #fff;
+    }
+:where(.page-onset) .page-subtitle{
+      font-size: .82em;
+      color: var(--text-dim);
+      margin: 0 0 2.2em;
+      letter-spacing: .04em}
+/* ── Picker popup ── */
+/* ── Picker popup ── */
+    :where(.page-onset) #colorPicker{
+      display: none;
+      position: fixed;
+      z-index: 999;
+      background: #1e2a38;
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: .6em;
+      padding: .7em;
+      box-shadow: 0 4px 24px rgba(0,0,0,.6);
+      user-select: none;
+    }
+:where(.page-onset) #colorPicker canvas{ display: block; border-radius: 50%; cursor: crosshair; }
+:where(.page-onset) #pickerSlider{
+      width: 160px; margin-top: .5em;
+      accent-color: #29b;
+    }
+:where(.page-onset) #pickerPreview{
+      width: 160px; height: 20px;
+      border-radius: 3px;
+      margin-top: .4em;
+      border: 1px solid rgba(255,255,255,.2);
+    }
+:where(.page-onset) #pickerClose{
+      display: block; margin-top: .5em; width: 100%;
+      padding: .3em; font-size: .9em;
+      border-radius: .4em; border: 0;
+      background: #29b; color: #fff; cursor: pointer;
+    }
+/* ═══════════════════════════════════════════════════════════════════════════
+   VEPeagle — Light / dark theme system
+   Activate light mode by setting  data-theme="light"  on <html>.
+   Dark mode is the default (no attribute needed).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Toggle button ── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   VEPeagle — Light / dark theme system
+   Activate light mode by setting  data-theme="light"  on <html>.
+   Dark mode is the default (no attribute needed).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Toggle button ── */
+:where(.page-onset) #overlayInner{ position: relative; }
+/* ── Light theme overrides ─────────────────────────────────────────────── */
+/* ── Light theme overrides ─────────────────────────────────────────────── */
+html:where(.page-onset)[data-theme="light"] body{ background: #dfe5ed; }
+html:where(.page-onset)[data-theme="light"] .page-subtitle{ color: #4a6a80; }
+/* ── Log Analyzer ── */
+/* ── Log Analyzer ── */
+html:where(.page-onset)[data-theme="light"] #dropZone{
+  background: rgba(0,70,110,.04);
+  border-color: rgba(0,70,110,.22);
+  color: #4a6a80;
+}
+html:where(.page-onset)[data-theme="light"] #contrastPreview{ color: #126478; }
+html:where(.page-onset)[data-theme="light"] #calFileMsg{ color: #2c4a58; }
+html:where(.page-onset)[data-theme="light"] #dropZone{ color: #2a4860; }
+html:where(.page-onset)[data-theme="light"] #contrastPreview{ color: #0f5470; }
+html:where(.page-onset)[data-theme="light"] .note{ color: #1a3848; }
+/* ═══ WebGL overlay, pause, child-panel ══════════════════════════════════ */
+/* ═══ WebGL overlay, pause, child-panel ══════════════════════════════════ */
+:where(.page-onset) #glCanvas{ position:fixed; top:0; left:0; width:100vw; height:100vh; display:none; pointer-events:none; z-index:5; }
+
+/* ── Motion-onset VEP (motion_onset_vep.html) — scope .page-motion ──────────── */
+html:where(.page-motion), :where(.page-motion) body{
+      margin: 0; padding: 0;
+      overflow: hidden;
+      background: var(--bg-page)}
+/* ── Setup overlay: vertically scrollable, centred ── */
+/* ── Setup overlay: vertically scrollable, centred ── */
+    :where(.page-motion) #overlay{
+      position: absolute; inset: 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      overflow-y: auto;
+      background: rgba(22, 24, 30, .97);
+      color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+/* Outer content wrapper: single centred column */
+/* Outer content wrapper: single centred column */
+    :where(.page-motion) #overlayInner{
+      width: 100%;
+      max-width: min(92vw, 800px);
+      padding: 2.4em 2em 1.8em;
+      box-sizing: border-box;
+    }
+/* ── Page heading ── */
+/* ── Page heading ── */
+    :where(.page-motion) h2{
+      margin: 0 0 .2em;
+      font-size: 1.5em;
+      font-weight: 700;
+      letter-spacing: .02em;
+      color: #fff;
+    }
+:where(.page-motion) .page-subtitle{
+      font-size: .82em;
+      color: var(--text-dim);
+      margin: 0 0 2.2em;
+      letter-spacing: .04em}
+/* ── Picker popup ── */
+/* ── Picker popup ── */
+    :where(.page-motion) #colorPicker{
+      display: none;
+      position: fixed;
+      z-index: 999;
+      background: #1e2a38;
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: .6em;
+      padding: .7em;
+      box-shadow: 0 4px 24px rgba(0,0,0,.6);
+      user-select: none;
+    }
+:where(.page-motion) #colorPicker canvas{ display: block; border-radius: 50%; cursor: crosshair; }
+:where(.page-motion) #pickerSlider{
+      width: 160px; margin-top: .5em;
+      accent-color: #29b;
+    }
+:where(.page-motion) #pickerPreview{
+      width: 160px; height: 20px;
+      border-radius: 3px;
+      margin-top: .4em;
+      border: 1px solid rgba(255,255,255,.2);
+    }
+:where(.page-motion) #pickerClose{
+      display: block; margin-top: .5em; width: 100%;
+      padding: .3em; font-size: .9em;
+      border-radius: .4em; border: 0;
+      background: #29b; color: #fff; cursor: pointer;
+    }
+/* ── Colour picker popup ── */
+/* ── Colour picker popup ── */
+    :where(.page-motion) #colorPicker{
+      display: none;
+      position: fixed;
+      z-index: 999;
+      background: #1e2a38;
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: .6em;
+      padding: .7em;
+      box-shadow: 0 4px 24px rgba(0,0,0,.6);
+      user-select: none;
+    }
+:where(.page-motion) #colorPicker canvas{ display: block; border-radius: 50%; cursor: crosshair; }
+:where(.page-motion) #pickerSlider{
+      width: 160px; margin-top: .5em;
+      accent-color: #29b;
+    }
+:where(.page-motion) #pickerPreview{
+      width: 160px; height: 20px;
+      border-radius: 3px;
+      margin-top: .4em;
+      border: 1px solid rgba(255,255,255,.2);
+    }
+:where(.page-motion) #pickerClose{
+      display: block; margin-top: .5em; width: 100%;
+      padding: .3em; font-size: .9em;
+      border-radius: .4em; border: 0;
+      background: #29b; color: #fff; cursor: pointer;
+    }
+/* ═══════════════════════════════════════════════════════════════════════════
+   VEPeagle — Light / dark theme system
+   Activate light mode by setting  data-theme="light"  on <html>.
+   Dark mode is the default (no attribute needed).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Toggle button ── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   VEPeagle — Light / dark theme system
+   Activate light mode by setting  data-theme="light"  on <html>.
+   Dark mode is the default (no attribute needed).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Toggle button ── */
+:where(.page-motion) #overlayInner{ position: relative; }
+/* ── Light theme overrides ─────────────────────────────────────────────── */
+/* ── Light theme overrides ─────────────────────────────────────────────── */
+html:where(.page-motion)[data-theme="light"] body{ background: #dfe5ed; }
+html:where(.page-motion)[data-theme="light"] .page-subtitle{ color: #4a6a80; }
+/* ── Log Analyzer ── */
+/* ── Log Analyzer ── */
+html:where(.page-motion)[data-theme="light"] #dropZone{
+  background: rgba(0,70,110,.04);
+  border-color: rgba(0,70,110,.22);
+  color: #4a6a80;
+}
+html:where(.page-motion)[data-theme="light"] #contrastPreview{ color: #126478; }
+html:where(.page-motion)[data-theme="light"] #calFileMsg{ color: #2c4a58; }
+html:where(.page-motion)[data-theme="light"] #dropZone{ color: #2a4860; }
+html:where(.page-motion)[data-theme="light"] #contrastPreview{ color: #0f5470; }
+html:where(.page-motion)[data-theme="light"] .note{ color: #1a3848; }
+html:where(.page-motion)[data-theme="light"] .tip{ color: #1a3828; }
+/* ═══ WebGL overlay canvas & test badges ═══════════════════════════════ */
+/* ═══ WebGL overlay canvas & test badges ═══════════════════════════════ */
+:where(.page-motion) #glCanvas{
+  position: fixed; top: 0; left: 0; display: none;
+  pointer-events: none;   /* let mouse events reach the overlay */
+  z-index: 5;
+  image-rendering: pixelated;
+}
+
+/* ── Oddball VEP (oddball_vep.html) — scope .page-oddball ───────────────────── */
+html:where(.page-oddball), :where(.page-oddball) body{
+      margin: 0; padding: 0;
+      overflow: hidden;
+      background: var(--bg-page)}
+:where(.page-oddball) #overlay{
+      position: absolute; inset: 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      overflow-y: auto;
+      background: rgba(22, 24, 30, .97);
+      color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+:where(.page-oddball) #overlayInner{
+      width: 100%;
+      max-width: min(92vw, 800px);
+      padding: 2.4em 2em 1.8em;
+      box-sizing: border-box;
+    }
+:where(.page-oddball) h2{
+      margin: 0 0 .2em;
+      font-size: 1.5em;
+      font-weight: 700;
+      letter-spacing: .02em;
+      color: #fff;
+    }
+:where(.page-oddball) .page-subtitle{
+      font-size: .82em;
+      color: var(--text-dim);
+      margin: 0 0 2.2em;
+      letter-spacing: .04em}
+/* ── Picker popup ── */
+/* ── Picker popup ── */
+    :where(.page-oddball) #colorPicker{
+      display: none;
+      position: fixed;
+      z-index: 999;
+      background: #1e2a38;
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: .6em;
+      padding: .7em;
+      box-shadow: 0 4px 24px rgba(0,0,0,.6);
+      user-select: none;
+    }
+:where(.page-oddball) #colorPicker canvas{ display: block; border-radius: 50%; cursor: crosshair; }
+:where(.page-oddball) #pickerSlider{
+      width: 160px; margin-top: .5em;
+      accent-color: #29b;
+    }
+:where(.page-oddball) #pickerPreview{
+      width: 160px; height: 20px;
+      border-radius: 3px;
+      margin-top: .4em;
+      border: 1px solid rgba(255,255,255,.2);
+    }
+:where(.page-oddball) #pickerClose{
+      display: block; margin-top: .5em; width: 100%;
+      padding: .3em; font-size: .9em;
+      border-radius: .4em; border: 0;
+      background: #29b; color: #fff; cursor: pointer;
+    }
+/* ═══════════════════════════════════════════════════════════════════════════
+   VEPeagle — Light / dark theme system
+   Activate light mode by setting  data-theme="light"  on <html>.
+   Dark mode is the default (no attribute needed).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Toggle button ── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   VEPeagle — Light / dark theme system
+   Activate light mode by setting  data-theme="light"  on <html>.
+   Dark mode is the default (no attribute needed).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Toggle button ── */
+:where(.page-oddball) #overlayInner{ position: relative; }
+/* ── Light theme overrides ─────────────────────────────────────────────── */
+/* ── Light theme overrides ─────────────────────────────────────────────── */
+html:where(.page-oddball)[data-theme="light"] body{ background: #dfe5ed; }
+html:where(.page-oddball)[data-theme="light"] .page-subtitle{ color: #4a6a80; }
+/* ── Log Analyzer ── */
+/* ── Log Analyzer ── */
+html:where(.page-oddball)[data-theme="light"] #dropZone{
+  background: rgba(0,70,110,.04);
+  border-color: rgba(0,70,110,.22);
+  color: #4a6a80;
+}
+html:where(.page-oddball)[data-theme="light"] #contrastPreview{ color: #126478; }
+html:where(.page-oddball)[data-theme="light"] #calFileMsg{ color: #2c4a58; }
+html:where(.page-oddball)[data-theme="light"] #dropZone{ color: #2a4860; }
+html:where(.page-oddball)[data-theme="light"] #contrastPreview{ color: #0f5470; }
+html:where(.page-oddball)[data-theme="light"] .note{ color: #1a3848; }
+/* ═══ Oddball: stimulus table, SVG rows, sync rows ════════════════════════ */
+/* ═══ Oddball: stimulus table, SVG rows, sync rows ════════════════════════ */
+:where(.page-oddball) select.shape-select{
+  width: 100%; box-sizing: border-box; padding: .3em .45em; border-radius: .4em;
+  border: 1px solid var(--border); background: var(--surface-sunken); color: #fff;
+  font-size: .93em}
+:where(.page-oddball) select.shape-select:focus{ outline: none; border-color: var(--accent)}
+:where(.page-oddball) .stim-grid{
+  display: grid; grid-template-columns: 1.2fr 1fr 1.5fr .9fr;
+  gap: .45em .8em; align-items: center;
+}
+:where(.page-oddball) .stim-grid .span-all{ grid-column: 1 / -1; }
+:where(.page-oddball) .stim-head{ font-size: .72em; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim)}
+    html:where(.page-oddball)[data-theme="light"] .stim-head{ color: #46606f; }
+:where(.page-oddball) .stim-label{ color: var(--text-soft); font-size: .9em}
+:where(.page-oddball) .stim-count{ font-family: monospace; color: var(--accent); font-size: .93em}
+:where(.page-oddball) .stim-svg{ display: none; align-items: center; gap: .7em; flex-wrap: wrap;
+            margin: -.15em 0 .25em; padding-left: .2em; }
+:where(.page-oddball) .stim-svg.shown{ display: flex; }
+:where(.page-oddball) .file-btn{
+  display: inline-block; padding: .22em .8em; font-size: .8em; border-radius: 1.2em;
+  border: 1px solid rgba(123,200,232,.3); background: var(--surface); color: var(--accent);
+  cursor: pointer; margin: 0}
+:where(.page-oddball) .stim-note{ font-size: .78em; color: var(--text-faint)}
+:where(.page-oddball) .stim-note.bad{ color: var(--warn)}
+:where(.page-oddball) .stim3.off{ opacity: .35; pointer-events: none; }
+:where(.page-oddball) .stim-svg.stim3.off{ display: none; }
+:where(.page-oddball) .sync-rows{ display: flex; flex-direction: column; gap: .4em; }
+:where(.page-oddball) .sync-row{ justify-content: flex-start; }
+:where(.page-oddball) .sync-row.off{ display: none; }
+:where(.page-oddball) .sync-label{ min-width: 15.5em; font-size: .85em; }
+html:where(.page-oddball)[data-theme="light"] select.shape-select{ background: #fff; border-color: rgba(0,70,110,.22); color: #0d1520; }
+html:where(.page-oddball)[data-theme="light"] .stim-count{ color: #0d5472; }
+html:where(.page-oddball)[data-theme="light"] .file-btn{ border-color: rgba(18,100,120,.35)}
+html:where(.page-oddball)[data-theme="light"] .stim-note{ color: #2c4a58; }
+html:where(.page-oddball)[data-theme="light"] .stim-note.bad{ color: #7a4200; }
+/* ═══ WebGL overlay, pause, child-panel ══════════════════════════════════ */
+/* ═══ WebGL overlay, pause, child-panel ══════════════════════════════════ */
+:where(.page-oddball) #glCanvas{ position:fixed; top:0; left:0; width:100vw; height:100vh; display:none; pointer-events:none; z-index:5; }
+
+/* ── Gate (vep_gate.html) — scope .page-gate ────────────────────────────────── */
+html:where(.page-gate), :where(.page-gate) body{
+      margin: 0; padding: 0;
+      overflow-x: hidden;
+      background: var(--bg-page);
+      min-height: 100vh}
+:where(.page-gate) #overlay{
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      overflow-y: auto;
+      background: rgba(22, 24, 30, .97);
+      color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+:where(.page-gate) #overlayInner{
+      width: 100%;
+      max-width: min(92vw, 800px);
+      padding: 2.4em 2em 1.8em;
+      box-sizing: border-box;
+    }
+:where(.page-gate) h2{
+      margin: 0 0 .2em;
+      font-size: 1.5em;
+      font-weight: 700;
+      letter-spacing: .02em;
+      color: #fff;
+    }
+:where(.page-gate) .page-subtitle{
+      font-size: .82em;
+      color: var(--text-dim);
+      margin: 0 0 2.2em;
+      letter-spacing: .04em}
+/* ── Launch area ── */
+/* ── Launch area ── */
+    :where(.page-gate) .launch-area{
+      margin-top: 1.8em;
+      padding-top: 1.4em;
+      border-top: 1px solid rgba(255,255,255,.1);
+    }
+:where(.page-gate) .launch-grid{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .75em;
+    }
+:where(.page-gate) .launch-btn{
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      text-decoration: none;
+      border-radius: .55em;
+      border: 1px solid rgba(123, 200, 232, .2);
+      background: rgba(0, 0, 0, .35);
+      overflow: hidden;
+      transition: border-color .18s, background .18s;
+      cursor: pointer;
+    }
+:where(.page-gate) .launch-btn:hover{
+      border-color: rgba(123, 200, 232, .55);
+      background: rgba(41, 187, 187, .07);
+    }
+:where(.page-gate) .launch-btn:active{ background: rgba(41, 187, 187, .15); }
+:where(.page-gate) .launch-btn-head{
+      padding: .6em .85em .45em;
+      background: rgba(123, 200, 232, .07);
+      border-bottom: 1px solid rgba(123, 200, 232, .12);
+    }
+:where(.page-gate) .launch-btn-title{
+      font-size: .95em;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: .02em;
+      margin: 0 0 .12em}
+:where(.page-gate) .launch-btn-abbr{
+      font-size: .72em;
+      color: #678a99;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+:where(.page-gate) .launch-btn-body{
+      padding: .5em .85em .65em;
+      font-size: .78em;
+      color: var(--text-faint);
+      line-height: 1.4;
+      flex: 1}
+:where(.page-gate) .launch-btn-footer{
+      padding: .45em .85em;
+      background: rgba(41,187,187,.1);
+      border-top: 1px solid rgba(123,200,232,.1);
+      font-size: .78em;
+      color: #5ab0c8;
+      font-weight: 600;
+      letter-spacing: .04em;
+      display: flex;
+      align-items: center;
+      gap: .4em;
+    }
+:where(.page-gate) .launch-btn:hover .launch-btn-footer{
+      color: var(--accent);
+      background: rgba(41,187,187,.18)}
+:where(.page-gate) .launch-btn-footer::before{
+      content: '→';
+      font-size: 1em;
+    }
+:where(.page-gate) details.setup{ margin-bottom: 2em; }
+:where(.page-gate) details.setup > summary{
+      cursor: pointer; list-style: none; padding-bottom: .45em; margin-bottom: .65em;
+      border-bottom: 1px solid var(--border-accent);
+      font-size: .92em; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+      color: var(--accent)}
+:where(.page-gate) details.setup > summary::-webkit-details-marker{ display: none; }
+:where(.page-gate) details.setup > summary::before{ content: '\25B8\00a0'; font-size: .9em; }
+:where(.page-gate) details.setup[open] > summary::before{ content: '\25BE\00a0'; }
+/* Collapsible section headings follow .section-title in both themes. */
+html:where(.page-gate)[data-theme="light"] details.setup > summary{
+      color: #126478;
+      border-bottom-color: rgba(0,80,120,.18);
+    }
+:where(.page-gate) details.setup > summary .sum{
+      float: right; font-weight: 400; letter-spacing: normal; text-transform: none;
+      font-size: .84em; color: var(--text-faint)}
+:where(.page-gate) .pill-btn{
+      display: inline-block; padding: .32em .95em; font: inherit; font-size: .84em;
+      border-radius: 1.2em; border: 1px solid rgba(123,200,232,.3);
+      background: var(--surface); color: var(--accent); cursor: pointer}
+:where(.page-gate) .pill-btn:hover{ filter: brightness(1.15); }
+:where(.page-gate) .pill-btn.danger{ border-color: rgba(232,107,107,.4); color: var(--danger)}
+:where(.page-gate) .cond-row{
+      display: flex; align-items: center; gap: .6em; padding: .5em .7em; margin-bottom: .45em;
+      border-radius: .5em; border: 1px solid var(--tint-accent); background: var(--surface)}
+:where(.page-gate) .cond-row .cond-name{ flex: 1 1 auto; min-width: 0; }
+:where(.page-gate) .cond-row .cond-name b{ display: block; color: var(--text-strong); font-size: .95em; }
+:where(.page-gate) .cond-row .cond-name small{
+      display: block; color: var(--text-faint); font-size: .76em;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap}
+:where(.page-gate) .cond-acts{ display: flex; gap: .35em; flex: 0 0 auto; }
+/* Same shape as Start in the stimulus run panel, so the button that begins a
+       run looks the same wherever the operator meets it. */
+/* Same shape as Start in the stimulus run panel, so the button that begins a
+       run looks the same wherever the operator meets it. */
+    :where(.page-gate) .cond-run{
+      padding: .45em 1.6em; font-size: .92em; border-radius: 2em; border: 0;
+      background: #29b; color: #fff; text-decoration: none; white-space: nowrap;
+    }
+:where(.page-gate) .cond-run:hover{ background: #18b; }
+/* ═══════════════════════════════════════════════════════════════════════════
+   VEPeagle — Light / dark theme system
+   Activate light mode by setting  data-theme="light"  on <html>.
+   Dark mode is the default (no attribute needed).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Toggle button ── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   VEPeagle — Light / dark theme system
+   Activate light mode by setting  data-theme="light"  on <html>.
+   Dark mode is the default (no attribute needed).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Toggle button ── */
+:where(.page-gate) #overlayInner{ position: relative; }
+/* ── Light theme overrides ─────────────────────────────────────────────── */
+/* ── Light theme overrides ─────────────────────────────────────────────── */
+html:where(.page-gate)[data-theme="light"] body{ background: #dfe5ed; }
+html:where(.page-gate)[data-theme="light"] .page-subtitle{ color: #4a6a80; }
+/* ── Log Analyzer ── */
+/* ── Log Analyzer ── */
+html:where(.page-gate)[data-theme="light"] #dropZone{
+  background: rgba(0,70,110,.04);
+  border-color: rgba(0,70,110,.22);
+  color: #4a6a80;
+}
+html:where(.page-gate)[data-theme="light"] #contrastPreview{ color: #126478; }
+html:where(.page-gate)[data-theme="light"] #calFileMsg{ color: #2c4a58; }
+html:where(.page-gate)[data-theme="light"] #dropZone{ color: #2a4860; }
+html:where(.page-gate)[data-theme="light"] #contrastPreview{ color: #0f5470; }
+html:where(.page-gate)[data-theme="light"] .note{ color: #1a3848; }
+/* Launch-card overrides for light mode */
+/* Launch-card overrides for light mode */
+html:where(.page-gate)[data-theme="light"] .launch-btn{
+  background: rgba(255,255,255,.72);
+  border-color: rgba(0,80,120,.2);
+}
+html:where(.page-gate)[data-theme="light"] .launch-btn:hover{
+  background: rgba(255,255,255,.95);
+  border-color: rgba(0,80,120,.5);
+}
+html:where(.page-gate)[data-theme="light"] .launch-btn:active{
+  background: rgba(0,80,120,.06);
+}
+html:where(.page-gate)[data-theme="light"] .launch-btn-head{
+  background: rgba(0,80,120,.07);
+  border-bottom-color: rgba(0,80,120,.12);
+}
+html:where(.page-gate)[data-theme="light"] .launch-btn-title{ color: #0d5472; }
+html:where(.page-gate)[data-theme="light"] .launch-btn-abbr{ color: #2a4860; }
+html:where(.page-gate)[data-theme="light"] .launch-btn-body{ color: #1e3040; }
+html:where(.page-gate)[data-theme="light"] .launch-btn-footer{
+  color: #0d5472;
+  background: rgba(0,80,120,.07);
+  border-top-color: rgba(0,80,120,.1);
+}
+html:where(.page-gate)[data-theme="light"] .launch-btn:hover .launch-btn-footer{
+  color: #052535;
+  background: rgba(0,80,120,.13);
+}
+/* #7a9aaa used in several inline-set colours — add both encoded forms */
+/* #7a9aaa used in several inline-set colours — add both encoded forms */
+html:where(.page-gate)[data-theme="light"] [style*="color:#7a9aaa"],
+html:where(.page-gate)[data-theme="light"] [style*="color: #7a9aaa"]{ color: #2a4860 !important; }
+
+/* Dark-only rules recoloured above also paint the light theme. */
+html:where(.page-gate)[data-theme="light"] details.setup > summary .sum{ color: #53707f; }
+
+/* ── Display calibration (display_calibration.html) — scope .page-calibration ──── */
+html:where(.page-calibration), :where(.page-calibration) body{ margin: 0; padding: 0; overflow-x: hidden;
+    background: var(--bg-page); min-height: 100vh}
+:where(.page-calibration) #overlay{ min-height: 100vh; display: flex; align-items: flex-start;
+    justify-content: center; overflow-y: auto;
+    background: rgba(22,24,30,.97); color: #e0e0e0;
+    font-family: system-ui, sans-serif; font-size: 14px; line-height: 1.5; }
+:where(.page-calibration) #overlayInner{ width: 100%; max-width: min(92vw, 800px);
+    padding: 2.4em 2em 2em; box-sizing: border-box; }
+:where(.page-calibration) h2{ margin: 0 0 .15em; font-size: 1.5em; font-weight: 700; color: #fff; }
+:where(.page-calibration) .page-subtitle{ font-size: .82em; color: var(--text-dim);
+    margin: 0 0 1.6em; letter-spacing: .04em}
+:where(.page-calibration) input[type=number], :where(.page-calibration) input[type=text]{
+    width: 100%; box-sizing: border-box; padding: .32em .5em;
+    border-radius: .4em; border: 1px solid var(--border);
+    background: var(--surface-sunken); color: #fff; font-size: .93em}
+:where(.page-calibration) input:focus{ outline: none; border-color: var(--accent)}
+:where(.page-calibration) input[type=radio]{ accent-color: #29b; cursor: pointer; }
+:where(.page-calibration) .radio-row{ display: flex; gap: 1.6em; flex-wrap: wrap; }
+:where(.page-calibration) .radio-row label{ display: flex; align-items: center; gap: .4em;
+    color: var(--text-soft); cursor: pointer; font-size: .92em}
+:where(.page-calibration) .status-bar{ padding: .55em .9em; border-radius: .4em;
+    margin-bottom: 1.2em; border: 1px solid; font-size: .9em; line-height: 1.55; }
+:where(.page-calibration) .status-bar.ok{ border-color: rgba(89,192,139,.35);
+    background: rgba(89,192,139,.07); color: #8dcfa8; }
+:where(.page-calibration) .status-bar.warn{ border-color: rgba(232,165,90,.35);
+    background: rgba(232,165,90,.07); color: var(--warn)}
+:where(.page-calibration) .status-bar.none{ border-color: rgba(255,255,255,.1);
+    background: rgba(0,0,0,.25); color: var(--text-faint)}
+:where(.page-calibration) table.meas{ margin: 0; width: 100%; border-collapse: collapse; font-size: .88em; }
+:where(.page-calibration) table.meas th{ color: var(--accent); font-size: .78em; letter-spacing: .06em;
+    text-transform: uppercase; padding: .3em .5em;
+    border-bottom: 1px solid rgba(123,200,232,.2); text-align: left}
+:where(.page-calibration) table.meas td{ padding: .28em .4em;
+    border-bottom: 1px solid rgba(255,255,255,.06); vertical-align: middle; }
+:where(.page-calibration) table.meas td.v-cell{ font-family: monospace; color: var(--accent);
+    width: 2.5em; text-align: right}
+:where(.page-calibration) table.meas td.sw-cell{ width: 2em; text-align: center; }
+:where(.page-calibration) .meas-swatch{ display: inline-block; width: 20px; height: 20px;
+    border-radius: 3px; border: 1px solid var(--border-strong);
+    vertical-align: middle}
+:where(.page-calibration) table.meas td input.L-input{ width: 88px; padding: .22em .4em;
+    border-radius: .3em; border: 1px solid var(--border);
+    background: rgba(0,0,0,.35); color: #fff;
+    font-family: monospace; font-size: .92em}
+:where(.page-calibration) table.meas td input.L-input:focus{ outline: none; border-color: var(--accent)}
+:where(.page-calibration) table.meas td input.L-input.filled{ border-color: rgba(89,192,139,.45); color: #9de; }
+:where(.page-calibration) .dot{ display: inline-block; width: 7px; height: 7px;
+    border-radius: 50%; background: #2a3540; }
+:where(.page-calibration) .dot.done{ background: var(--ok)}
+:where(.page-calibration) .btn-show{ padding: .18em .5em; font-size: .79em; border-radius: .8em;
+    border: 0; background: rgba(123,200,232,.16); color: #cfe; cursor: pointer; }
+:where(.page-calibration) .btn-show:hover{ background: rgba(123,200,232,.28); color: #fff; }
+:where(.page-calibration) .tab-row{ display: flex; gap: .4em; margin-bottom: .7em; }
+:where(.page-calibration) .tab-btn{ padding: .28em .75em; font-size: .82em; border-radius: 1.2em;
+    border: 1px solid rgba(255,255,255,.14); background: var(--surface);
+    color: #8ab; cursor: pointer}
+:where(.page-calibration) .tab-btn.active{ background: var(--tint-accent);
+    border-color: var(--accent); color: var(--accent)}
+:where(.page-calibration) .plot-wrap{ background: rgba(0,0,0,.35);
+    border: 1px solid rgba(255,255,255,.07); border-radius: .4em;
+    padding: .8em; text-align: center; }
+:where(.page-calibration) .legend-key{ vertical-align: -2px; margin-right: .25em; }
+:where(.page-calibration) .legend-bg{ fill: rgba(0,0,0,.35); }
+:where(.page-calibration) .legend-srgb{ stroke: rgba(150,150,150,.4); }
+:where(.page-calibration) .legend-model{ stroke: #7bc8e8; }
+:where(.page-calibration) .legend-model-text{ color: #7bc8e8; }
+:where(.page-calibration) .verif-grid{ display: grid; grid-template-columns: auto 1fr;
+    gap: .8em 1.4em; align-items: center; }
+:where(.page-calibration) .verif-swatch-btn{ cursor: pointer; text-align: center; }
+:where(.page-calibration) .v-swatch{ display: block; width: 64px; height: 64px;
+    border-radius: .4em; border: 2px solid var(--border-strong);
+    margin-bottom: .3em}
+:where(.page-calibration) button.primary{ padding: .42em 1.3em; font-size: .9em; font-weight: 600;
+    border-radius: 1.5em; border: 0;
+    background: rgba(41,187,187,.22); color: #7be; cursor: pointer; }
+:where(.page-calibration) button.primary:hover{ background: rgba(41,187,187,.38); color: #fff; }
+:where(.page-calibration) button.danger{ padding: .42em 1.3em; font-size: .9em;
+    border-radius: 1.5em; border: 0;
+    background: rgba(200,80,80,.15); color: #e88; cursor: pointer; }
+:where(.page-calibration) button.danger:hover{ background: rgba(200,80,80,.3); color: #fbb; }
+:where(.page-calibration) a.link-btn{ display: inline-block; padding: .38em 1.1em;
+    font-size: .88em; border-radius: 1.3em;
+    border: 1px solid rgba(123,200,232,.3);
+    color: var(--accent); text-decoration: none}
+:where(.page-calibration) a.link-btn:hover{ background: rgba(123,200,232,.1); color: #fff; }
+:where(.page-calibration) .hidden{ display: none !important; }
+:where(.page-calibration) .doc-footer{ margin-top: 2em; padding-top: .7em;
+    border-top: 1px solid var(--border-soft);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: .72em; color: var(--text-faint); flex-wrap: wrap; gap: .3em}
+/* Patch overlay */
+/* Patch overlay */
+  :where(.page-calibration) #patchOverlay{ display: none; position: fixed; inset: 0;
+    z-index: 9999; flex-direction: column; }
+:where(.page-calibration) #patchOverlay.active{ display: flex; }
+:where(.page-calibration) #patchBg{ flex: 1; }
+:where(.page-calibration) #patchControls{ padding: .85em 1.2em; background: rgba(14,17,22,.93);
+    display: flex; align-items: center; gap: .9em; flex-wrap: wrap;
+    border-top: 1px solid rgba(255,255,255,.1); }
+:where(.page-calibration) #patchVLabel{ font-family: monospace; font-size: .82em;
+    color: var(--text-faint); white-space: nowrap}
+:where(.page-calibration) #patchStep{ font-size: .84em; color: var(--accent);
+    letter-spacing: .03em; white-space: nowrap; min-width: 9em}
+:where(.page-calibration) #patchLInput{ width: 90px; padding: .3em .5em; border-radius: .35em;
+    border: 1px solid var(--border-strong); background: rgba(0,0,0,.5);
+    color: #fff; font-family: monospace; font-size: .93em}
+:where(.page-calibration) #patchLInput:focus{ outline: none; border-color: var(--accent)}
+:where(.page-calibration) .pnav{ padding: .3em .85em; font-size: .84em; border-radius: 1em;
+    border: 0; background: var(--tint-accent); color: #cfe; cursor: pointer}
+:where(.page-calibration) .pnav:hover{ background: rgba(123,200,232,.3); color: #fff; }
+:where(.page-calibration) #patchClose{ padding: .3em .85em; font-size: .84em; border-radius: 1em;
+    border: 0; background: rgba(200,80,80,.2); color: #faa;
+    cursor: pointer; margin-left: auto; }
+:where(.page-calibration) #patchClose:hover{ background: rgba(200,80,80,.4); color: #fff; }
+:where(.page-calibration) #verifOvl{ display: none; position: fixed; inset: 0;
+    z-index: 9998; flex-direction: column; }
+:where(.page-calibration) #verifOvl.active{ display: flex; }
+:where(.page-calibration) #verifBg{ flex: 1; background: #808080; }
+:where(.page-calibration) #verifBar{ padding: .8em 1.2em; background: rgba(14,17,22,.93);
+    display: flex; align-items: center; gap: 1em; flex-wrap: wrap;
+    border-top: 1px solid rgba(255,255,255,.1);
+    font-size: .88em; color: var(--accent)}
+/* ═══════════════════════════════════════════════════════════════════════════
+   VEPeagle — Light / dark theme system
+   Activate light mode by setting  data-theme="light"  on <html>.
+   Dark mode is the default (no attribute needed).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Toggle button ── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   VEPeagle — Light / dark theme system
+   Activate light mode by setting  data-theme="light"  on <html>.
+   Dark mode is the default (no attribute needed).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Toggle button ── */
+:where(.page-calibration) #overlayInner{ position: relative; }
+/* ── Light theme overrides ─────────────────────────────────────────────── */
+/* ── Light theme overrides ─────────────────────────────────────────────── */
+html:where(.page-calibration)[data-theme="light"] body{ background: #dfe5ed; }
+html:where(.page-calibration)[data-theme="light"] .page-subtitle{ color: #4a6a80; }
+html:where(.page-calibration)[data-theme="light"] .status-bar.none{
+  background: rgba(0,70,110,.05);
+  border-color: rgba(0,70,110,.2)}
+html:where(.page-calibration)[data-theme="light"] .status-bar.ok{
+  background: rgba(30,110,70,.07);
+  border-color: rgba(30,110,70,.3);
+  color: #1a5a38;
+}
+html:where(.page-calibration)[data-theme="light"] .status-bar.warn{
+  background: rgba(140,80,10,.07);
+  border-color: rgba(140,80,10,.3)}
+html:where(.page-calibration)[data-theme="light"] a.link-btn{
+  border-color: rgba(18,100,120,.35)}
+html:where(.page-calibration)[data-theme="light"] a.link-btn:hover{
+  background: rgba(18,100,120,.09);
+  color: #052535;
+}
+/* ── Log Analyzer ── */
+/* ── Log Analyzer ── */
+html:where(.page-calibration)[data-theme="light"] #dropZone{
+  background: rgba(0,70,110,.04);
+  border-color: rgba(0,70,110,.22);
+  color: #4a6a80;
+}
+html:where(.page-calibration)[data-theme="light"] table.meas td input.L-input{
+  background: #fff;
+  border-color: rgba(0,70,110,.2);
+  color: #0d1520;
+}
+html:where(.page-calibration)[data-theme="light"] table.meas td input.L-input.filled{
+  border-color: rgba(30,110,70,.4);
+}
+html:where(.page-calibration)[data-theme="light"] .btn-show{
+  background: rgba(18,100,120,.12);
+  color: #126478;
+}
+html:where(.page-calibration)[data-theme="light"] .btn-show:hover{
+  background: rgba(18,100,120,.24);
+  color: #052535;
+}
+html:where(.page-calibration)[data-theme="light"] .tab-btn{
+  border-color: rgba(0,70,110,.2);
+  color: #53707f}
+html:where(.page-calibration)[data-theme="light"] .plot-wrap{
+  background: rgba(0,70,110,.04);
+  border-color: rgba(0,70,110,.12);
+}
+html:where(.page-calibration)[data-theme="light"] #contrastPreview{ color: #126478; }
+html:where(.page-calibration)[data-theme="light"] .legend-srgb{ stroke: #000; }
+html:where(.page-calibration)[data-theme="light"] .legend-model-text{ color: #0d5472; }
+html:where(.page-calibration)[data-theme="light"] .tab-btn{ color: #2c4a58; }
+html:where(.page-calibration)[data-theme="light"] .tab-btn.active{ color: #0f5470; }
+html:where(.page-calibration)[data-theme="light"] #calFileMsg{ color: #2c4a58; }
+html:where(.page-calibration)[data-theme="light"] #dropZone{ color: #2a4860; }
+html:where(.page-calibration)[data-theme="light"] .status-bar.none{ color: #2a4860; }
+    html:where(.page-calibration)[data-theme="light"] #patchStep{ color: #46606f; }
+html:where(.page-calibration)[data-theme="light"] #contrastPreview{ color: #0f5470; }
+html:where(.page-calibration)[data-theme="light"] .note{ color: #1a3848; }
+
+/* Dark-only rules recoloured above also paint the light theme. */
+html:where(.page-calibration)[data-theme="light"] .doc-footer{ color: #53707f; }
+
+/* ── Log analyzer (vep_log_analyzer.html) — scope .page-analyzer ────────────── */
+html:where(.page-analyzer), :where(.page-analyzer) body{ margin: 0; padding: 0; overflow-x: hidden; background: var(--bg-page); min-height: 100vh}
+:where(.page-analyzer) #overlay{
+      min-height: 100vh;
+      display: flex; align-items: flex-start; justify-content: center;
+      overflow-y: auto;
+      background: rgba(22, 24, 30, .97);
+      color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      font-size: 14px; line-height: 1.5;
+    }
+:where(.page-analyzer) #overlayInner{
+      width: 100%; max-width: min(92vw, 800px);
+      padding: 2.4em 2em 1.8em;
+      box-sizing: border-box;
+    }
+:where(.page-analyzer) h2{
+      margin: 0 0 .2em;
+      font-size: 1.5em; font-weight: 700;
+      letter-spacing: .02em; color: #fff;
+    }
+:where(.page-analyzer) .page-subtitle{
+      font-size: .82em; color: var(--text-dim);
+      margin: 0 0 2.2em; letter-spacing: .04em}
+/* ── File-drop area ── */
+/* ── File-drop area ── */
+    :where(.page-analyzer) .drop-zone{
+      display: block;
+      box-sizing: border-box;
+      font-size: 1em; color: inherit; margin-bottom: 0;
+      width: 100%;
+      border: 2px dashed rgba(123, 200, 232, .25);
+      border-radius: .55em;
+      padding: 1.6em 1em;
+      text-align: center;
+      background: rgba(0, 0, 0, .25);
+      transition: border-color .18s, background .18s;
+      cursor: pointer;
+    }
+:where(.page-analyzer) .drop-zone:hover, :where(.page-analyzer) .drop-zone.dragover{
+      border-color: var(--accent);
+      background: rgba(41, 187, 187, .08)}
+:where(.page-analyzer) .drop-zone-title{
+      font-size: 1em; color: var(--accent); font-weight: 600;
+      margin-bottom: .25em; letter-spacing: .01em}
+:where(.page-analyzer) .drop-zone-sub{
+      font-size: .82em; color: var(--text-faint)}
+:where(.page-analyzer) #fileInput{ display: none; }
+/* ── Session-summary card ── */
+/* ── Session-summary card ── */
+    :where(.page-analyzer) .summary-card{
+      background: rgba(0, 0, 0, .35);
+      border: 1px solid rgba(123, 200, 232, .12);
+      border-radius: .5em;
+      padding: .8em 1em;
+      margin-bottom: 1.2em;
+      font-size: .88em;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: .35em 1em;
+    }
+:where(.page-analyzer) .summary-card .k{ color: var(--text-faint); font-size: .82em; letter-spacing: .03em; text-transform: uppercase}
+:where(.page-analyzer) .summary-card .v{ color: #fff; font-family: monospace; }
+
+    /* Light mode needs its own pair here: the key was a pale blue and the value
+       plain white, both of which vanish on a light page. */
+    html:where(.page-analyzer)[data-theme="light"] .summary-card .k{ color: #48606e; }
+    html:where(.page-analyzer)[data-theme="light"] .summary-card .v{ color: #0a1422; }
+    /* The rendered report was styled for a dark page only. */
+    html:where(.page-analyzer)[data-theme="light"] .metric-group-title{ color: rgba(18,100,120,.85); }
+    html:where(.page-analyzer)[data-theme="light"] .frame-breakdown-note code{ color: #0f4d5e}
+:where(.page-analyzer) td.metric-name{ color: var(--text-soft); font-weight: 500}
+:where(.page-analyzer) td.metric-target{ color: var(--accent); font-family: monospace}
+:where(.page-analyzer) td.numeric{ color: #fff; font-family: monospace; }
+:where(.page-analyzer) .table-wrap{
+      background: var(--surface);
+      border-radius: .45em;
+      padding: .6em .9em;
+      overflow-x: auto;
+      border: 1px solid rgba(255, 255, 255, .05)} :where(.page-analyzer) 100%{ color: #d8d2c0; } :where(.page-analyzer) }
+/* ── Empty / error states ── */
+/* ── Empty / error states ── */
+    .empty, :where(.page-analyzer) .error{
+      padding: 1em 1.2em;
+      border-radius: .4em;
+      font-size: .9em;
+      margin-top: 1em;
+    }
+:where(.page-analyzer) .empty{
+      background: var(--surface);
+      color: var(--text-dim);
+      border: 1px dashed rgba(123, 200, 232, .15)}
+:where(.page-analyzer) .error{
+      background: rgba(232, 100, 100, .1);
+      color: #e88;
+      border-left: 3px solid #e88;
+    }
+/* ── Footer ── */
+/* ── Footer ── */
+    :where(.page-analyzer) .doc-footer{
+      margin-top: 2em; padding-top: .7em;
+      border-top: 1px solid var(--border-soft);
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: .72em; color: var(--text-faint);
+      flex-wrap: wrap; gap: .3em}
+:where(.page-analyzer) .doc-footer a:hover{ color: #fff; }
+/* ── Sub-section dividers within a stimulus result ── */
+/* ── Sub-section dividers within a stimulus result ── */
+    :where(.page-analyzer) .metric-group{
+      margin-bottom: 1.4em;
+    }
+:where(.page-analyzer) .metric-group:last-child{ margin-bottom: 0; }
+:where(.page-analyzer) .metric-group-title{
+      font-size: .8em; font-weight: 600;
+      letter-spacing: .1em; text-transform: uppercase;
+      color: rgba(123, 200, 232, .65);
+      margin: 0 0 .45em;
+    }
+/* ── Frame-quantisation breakdown ── */
+/* ── Frame-quantisation breakdown ── */
+    :where(.page-analyzer) .frame-breakdown{
+      margin-top: .9em;
+      padding: .7em .8em;
+      background: rgba(123, 200, 232, .04);
+      border-left: 2px solid rgba(123, 200, 232, .25);
+      border-radius: .35em;
+    }
+:where(.page-analyzer) .frame-breakdown-title{
+      font-size: .8em; color: var(--accent);
+      letter-spacing: .04em; margin-bottom: .5em;
+      font-weight: 600}
+:where(.page-analyzer) .frame-breakdown-note{
+      margin-top: .55em;
+      font-size: .82em;
+      color: #8aa0aa;
+      line-height: 1.55;
+    }
+:where(.page-analyzer) .frame-breakdown-note code{
+      font-family: monospace; color: var(--accent);
+      background: var(--surface); padding: .04em .35em; border-radius: .25em}
+:where(.page-analyzer) .note-warn{ color: var(--warn)}
+/* ═══════════════════════════════════════════════════════════════════════════
+   VEPeagle — Light / dark theme system
+   Activate light mode by setting  data-theme="light"  on <html>.
+   Dark mode is the default (no attribute needed).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Toggle button ── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   VEPeagle — Light / dark theme system
+   Activate light mode by setting  data-theme="light"  on <html>.
+   Dark mode is the default (no attribute needed).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Toggle button ── */
+:where(.page-analyzer) #overlayInner{ position: relative; }
+/* ── Light theme overrides ─────────────────────────────────────────────── */
+/* ── Light theme overrides ─────────────────────────────────────────────── */
+html:where(.page-analyzer)[data-theme="light"] body{ background: #dfe5ed; }
+html:where(.page-analyzer)[data-theme="light"] .page-subtitle{ color: #4a6a80; }
+/* ── Log Analyzer ── */
+/* ── Log Analyzer ── */
+html:where(.page-analyzer)[data-theme="light"] #dropZone{
+  background: rgba(0,70,110,.04);
+  border-color: rgba(0,70,110,.22);
+  color: #4a6a80;
+}
+html:where(.page-analyzer)[data-theme="light"] #contrastPreview{ color: #126478; }
+html:where(.page-analyzer)[data-theme="light"] #calFileMsg{ color: #2c4a58; }
+html:where(.page-analyzer)[data-theme="light"] #dropZone{ color: #2a4860; }
+html:where(.page-analyzer)[data-theme="light"] #contrastPreview{ color: #0f5470; }
+html:where(.page-analyzer)[data-theme="light"] .note{ color: #1a3848; }
+/* .empty and .drop-zone in light mode: rgba dark bg collapses to grey */
+/* .empty and .drop-zone in light mode: rgba dark bg collapses to grey */
+html:where(.page-analyzer)[data-theme="light"] .empty{
+  background: rgba(0, 70, 110, .06);
+  border-color: rgba(0, 70, 110, .22);
+  color: #1c3f52;
+}
+html:where(.page-analyzer)[data-theme="light"] .drop-zone{
+  background: rgba(255, 255, 255, .55);
+  border-color: rgba(0, 70, 110, .25);
+}
+html:where(.page-analyzer)[data-theme="light"] .drop-zone:hover,
+html:where(.page-analyzer)[data-theme="light"] .drop-zone.dragover{
+  background: rgba(0, 80, 120, .08);
+  border-color: #0d5472;
+}
+html:where(.page-analyzer)[data-theme="light"] .drop-zone-title{ color: #0d5472; }
+html:where(.page-analyzer)[data-theme="light"] .drop-zone-sub{ color: #2a4860; }
+
+/* Dark-only rules recoloured above also paint the light theme. */
+html:where(.page-analyzer)[data-theme="light"] /* ── Footer ── */
+/* ── Footer ── */
+    .doc-footer{ color: #53707f; }
+
+/* ── Manual (manual.html) — scope .page-manual ──────────────────────────────── */
+html:where(.page-manual), :where(.page-manual) body{ margin: 0; padding: 0; background: var(--bg-doc); color: var(--text); }
+:where(.page-manual) body{
+      font-family: system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+/* ─── Page layout: sidebar + content ─── */
+/* ─── Page layout: sidebar + content ─── */
+    :where(.page-manual) .layout{
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      min-height: 100vh;
+    }
+@media (max-width: 800px) {
+      :where(.page-manual) .layout{ grid-template-columns: 1fr; }
+      :where(.page-manual) .sidebar{ position: relative; height: auto; max-height: 60vh; overflow-y: auto; }
+    }
+:where(.page-manual) .sidebar{
+      position: sticky;
+      top: 0;
+      align-self: start;
+      height: 100vh;
+      overflow-y: auto;
+      padding: 1.6em 1.2em;
+      background: var(--bg-doc-soft);
+      border-right: 1px solid var(--border-soft);
+      box-sizing: border-box;
+    }
+:where(.page-manual) .sidebar h1{
+      margin: 0 0 .15em;
+      font-size: 1em;
+      color: #fff;
+      letter-spacing: .02em;
+    }
+:where(.page-manual) .sidebar .sub{
+      font-size: .76em;
+      color: var(--text-mute);
+      margin-bottom: 1.5em;
+      letter-spacing: .04em;
+    }
+:where(.page-manual) .sidebar nav{ font-size: .88em; }
+:where(.page-manual) .sidebar nav h2{
+      font-size: .68em;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 1.4em 0 .35em;
+      padding-bottom: .25em;
+      border-bottom: 1px solid var(--border-accent);
+    }
+:where(.page-manual) .sidebar nav h2:first-child{ margin-top: 0; }
+:where(.page-manual) .sidebar nav a{
+      display: block;
+      padding: .15em 0 .15em .8em;
+      color: var(--text-soft);
+      text-decoration: none;
+      border-left: 2px solid transparent;
+      transition: color .15s, border-color .15s;
+    }
+:where(.page-manual) .sidebar nav a:hover{
+      color: var(--accent);
+      border-left-color: var(--accent);
+    }
+:where(.page-manual) .sidebar nav a.indent{ padding-left: 1.6em; font-size: .92em; color: var(--text-mute); }
+:where(.page-manual) main{
+      padding: 2em 2.4em 4em;
+      max-width: 880px;
+      box-sizing: border-box;
+    }
+/* ─── Headings ─── */
+/* ─── Headings ─── */
+    :where(.page-manual) h1, :where(.page-manual) h2, :where(.page-manual) h3, :where(.page-manual) h4{
+      color: #fff;
+      font-weight: 600;
+      letter-spacing: .01em;
+      scroll-margin-top: 1em;
+    }
+:where(.page-manual) h1{
+      font-size: 1.85em;
+      margin: 0 0 .15em;
+      padding-bottom: .25em;
+      border-bottom: 2px solid var(--accent);
+    }
+:where(.page-manual) .page-subtitle{
+      font-size: .9em;
+      color: var(--text-mute);
+      margin: 0 0 2em;
+      letter-spacing: .03em;
+    }
+:where(.page-manual) h2{
+      font-size: 1.4em;
+      margin: 2.2em 0 .5em;
+      padding-bottom: .3em;
+      border-bottom: 1px solid var(--border-accent);
+      color: var(--accent);
+    }
+:where(.page-manual) h3{
+      font-size: 1.12em;
+      margin: 1.6em 0 .4em;
+      color: #fff;
+    }
+:where(.page-manual) h4{
+      font-size: .95em;
+      margin: 1.2em 0 .3em;
+      color: var(--accent);
+      font-weight: 600;
+      letter-spacing: .02em;
+      text-transform: uppercase;
+      font-size: .82em;
+    }
+:where(.page-manual) p{ margin: .6em 0; color: var(--text-soft); }
+/* ─── Code & math ─── */
+/* ─── Code & math ─── */
+    :where(.page-manual) code{
+      font-family: 'SF Mono', Consolas, monospace;
+      font-size: .9em;
+      padding: .1em .35em;
+      background: var(--code-bg);
+      border-radius: .25em;
+      color: var(--accent);
+    }
+:where(.page-manual) pre{
+      background: var(--code-bg);
+      padding: .9em 1em;
+      border-radius: .4em;
+      font-size: .85em;
+      overflow-x: auto;
+      border: 1px solid var(--border-soft);
+      line-height: 1.5;
+    }
+:where(.page-manual) pre code{
+      background: none;
+      padding: 0;
+      color: var(--text);
+      font-size: 1em;
+    }
+:where(.page-manual) .math{
+      display: block;
+      text-align: center;
+      margin: 1em auto;
+      padding: .55em .8em;
+      background: var(--code-bg);
+      border-left: 3px solid var(--accent);
+      font-family: 'Cambria Math', 'STIX Two Math', Georgia, serif;
+      font-size: 1.05em;
+      color: var(--text);
+      max-width: max-content;
+    }
+/* ─── Lists ─── */
+/* ─── Lists ─── */
+    :where(.page-manual) ul, :where(.page-manual) ol{ padding-left: 1.4em; color: var(--text-soft); }
+:where(.page-manual) li{ margin: .3em 0; }
+/* ─── Figure / SVG cards ─── */
+/* ─── Figure / SVG cards ─── */
+    :where(.page-manual) figure{
+      margin: 1.2em 0;
+      padding: 1em 1em .6em;
+      background: var(--bg-doc-card);
+      border: 1px solid var(--border-soft);
+      border-radius: .5em;
+      text-align: center;
+    }
+:where(.page-manual) figure svg{ display: block; margin: 0 auto; max-width: 100%; height: auto; }
+:where(.page-manual) figcaption{
+      margin-top: .65em;
+      font-size: .82em;
+      color: var(--text-mute);
+      line-height: 1.5;
+      text-align: center;
+    }
+:where(.page-manual) .fig-row{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1em;
+      margin: 1em 0;
+    }
+:where(.page-manual) .fig-row figure{ margin: 0; }
+@media (max-width: 700px) {
+      :where(.page-manual) .fig-row{ grid-template-columns: 1fr; }
+    }
+/* ─── Hash anchor offset for sticky scrolling ─── */
+/* ─── Hash anchor offset for sticky scrolling ─── */
+    :where(.page-manual) section{ scroll-margin-top: .5em; }
+/* ─── Footer ─── */
+/* ─── Footer ─── */
+    :where(.page-manual) .doc-footer{
+      margin-top: 4em;
+      padding-top: 1em;
+      border-top: 1px solid var(--border-soft);
+      font-size: .78em;
+      color: var(--text-mute);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: .6em;
+    }
+/* ─── Inline keyboard / kbd ─── */
+/* ─── Inline keyboard / kbd ─── */
+    :where(.page-manual) kbd{
+      font-family: 'SF Mono', Consolas, monospace;
+      font-size: .82em;
+      padding: .12em .45em;
+      border: 1px solid var(--border-accent);
+      border-radius: .25em;
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 1px 0 var(--surface-sunken)}
+:where(.page-manual) a{ color: var(--accent); text-decoration: none; }
+:where(.page-manual) a:hover{ color: #fff; text-decoration: underline; }
+/* ── Light theme — manual ── */
+/* ── Light theme — manual ── */
+html:where(.page-manual)[data-theme="light"] body{
+  background: #e4eaf2;
+  color: #0d1520;
+}
+html:where(.page-manual)[data-theme="light"] .layout{ background: #e4eaf2; }
+html:where(.page-manual)[data-theme="light"] .sidebar{
+  background: #d0d9e6;
+  border-right-color: rgba(0,80,120,.18);
+}
+html:where(.page-manual)[data-theme="light"] .sidebar h1{ color: #0a1422; }
+html:where(.page-manual)[data-theme="light"] .sidebar .sub{ color: #3a5060; }
+html:where(.page-manual)[data-theme="light"] .sidebar nav h2{ color: #0d5472; }
+html:where(.page-manual)[data-theme="light"] .sidebar a{ color: #1e3040; }
+html:where(.page-manual)[data-theme="light"] .sidebar a.active,
+html:where(.page-manual)[data-theme="light"] .sidebar a:hover{
+  color: #0d5472; background: rgba(0,80,120,.12);
+}
+html:where(.page-manual)[data-theme="light"] main{
+  background: #f4f7fb;
+  color: #0d1520;
+}
+html:where(.page-manual)[data-theme="light"] main h1,
+html:where(.page-manual)[data-theme="light"] main h2,
+html:where(.page-manual)[data-theme="light"] main h3{ color: #0a1422; }
+html:where(.page-manual)[data-theme="light"] main h2{ border-bottom-color: rgba(0,80,120,.18); }
+html:where(.page-manual)[data-theme="light"] code, html:where(.page-manual)[data-theme="light"] pre{
+  background: rgba(0,60,100,.07);
+  border-color: rgba(0,60,100,.15);
+  color: #126478;
+}
+html:where(.page-manual)[data-theme="light"] #themeToggleBtn{
+  border-color: rgba(18,100,120,.28);
+  background: rgba(255,255,255,.7);
+  color: #126478;
+}
+html:where(.page-manual)[data-theme="light"] .page-subtitle{ color: #2a4860; }
+html:where(.page-manual)[data-theme="light"] #calFileMsg{ color: #2c4a58; }
+html:where(.page-manual)[data-theme="light"] #dropZone{ color: #2a4860; }
+html:where(.page-manual)[data-theme="light"] #contrastPreview{ color: #0f5470; }
+/* Redefine all CSS vars for light mode — fixes p, ul, ol, h4, code, etc. */
+/* Redefine all CSS vars for light mode — fixes p, ul, ol, h4, code, etc. */
+/* Hardcoded colours that bypass the variable system */
+/* Hardcoded colours that bypass the variable system */
+html:where(.page-manual)[data-theme="light"] h3,
+html:where(.page-manual)[data-theme="light"] h4{ color: #0a1422; }
+html:where(.page-manual)[data-theme="light"] main a:hover{ color: #0a1422; }
+html:where(.page-manual)[data-theme="light"] .sidebar nav a.indent{ color: #3a5a6a; }
+
+/* ── WebGL parity test (webgl_parity_test.html) — scope .page-parity ────────── */
+/* Document-style page: the shared rule hides overflow for the
+   stimulus pages, which run inside a fixed viewport. */
+html:where(.page-parity), :where(.page-parity) body{
+      margin: 0; padding: 0;
+      background: var(--bg-page);
+      min-height: 100vh; overflow-x: hidden; overflow-y: auto}
+    :where(.page-parity) body{ background: #10151d; padding: 2rem; box-sizing: border-box; }
+    :where(.page-parity) body{ color: #e6ecf4; }
+    html:where(.page-parity)[data-theme="light"] body{ background: #eef3fa; color: #142029; }
+    html:where(.page-parity)[data-theme="light"] p{ color: #2a3a46; }
+    html:where(.page-parity)[data-theme="light"] th{ color: #46606f; }
+    html:where(.page-parity)[data-theme="light"] code{ color: #0f4d5e; background: rgba(18,100,120,.08); }
+:where(.page-parity) body{ margin: 0; padding: 2rem; font: 15px/1.55 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+:where(.page-parity) h1{ font-size: 1.35rem; margin: 0 0 .3rem; }
+:where(.page-parity) p{ max-width: 62ch; color: #b9c4d2; }
+:where(.page-parity) code{ padding: .1em .4em; border-radius: .25em; }
+:where(.page-parity) .row{ display: flex; flex-wrap: wrap; gap: .6rem; margin: 1.2rem 0; }
+:where(.page-parity) .pass{ color: #57d08a; font-weight: 700; }
+:where(.page-parity) .fail{ color: var(--danger); font-weight: 700}
+    /* Light theme: the result words and the footnote were set for a dark page. */
+    html:where(.page-parity)[data-theme="light"] .pass{ color: #1b7a45; }
+    html:where(.page-parity)[data-theme="light"] small{ color: #46606f; }
+    html:where(.page-parity)[data-theme="light"] .params input{ color: #0a1422; }
+:where(.page-parity) small{ color: #8695a8; }
+:where(.page-parity) .params{ margin: .6rem 0 0; }
+:where(.page-parity) .params input{ font: inherit; padding: .35em .5em; border-radius: .4em;
+                  border: 1px solid #2f4258; background: #0f1620; color: #e6ecf4; width: 30rem; max-width: 100%; }:where(.page-parity) table{ width: auto; min-width: 640px; }

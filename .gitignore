@@ -1,0 +1,12 @@
+# Development dependencies for tests/ — reinstalled with `npm install`
+tests/node_modules/
+
+# Python bytecode from the development checks
+__pycache__/
+*.pyc
+
+# Probe and battery output
+*_probe.json
+vep_battery_logs/
+
+.DS_Store
